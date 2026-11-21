@@ -1,0 +1,83 @@
+# =============================================================================
+# File        : charts/tasktracker/values.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit III 3.2 - Helm values
+# Purpose     : Defines configurable defaults for all three application tiers.
+# =============================================================================
+
+existingSecret: tasktracker-credentials
+
+database:
+  replicaCount: 1
+
+  image:
+    repository: 02230290namgay/dso202-db
+    tag: "1.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 5432
+
+  persistence:
+    size: 1Gi
+
+  env:
+    POSTGRES_DB: taskdb
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+backend:
+  replicaCount: 1
+
+  image:
+    repository: 02230290namgay/dso202-backend
+    tag: "1.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 8080
+    targetPort: 8080
+
+  env:
+    DB_NAME: taskdb
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+frontend:
+  replicaCount: 1
+
+  image:
+    repository: 02230290namgay/dso202-frontend
+    tag: "1.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: NodePort
+    port: 80
+    targetPort: 8080
+    nodePort: 30080
+
+  env: {}
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  enabled: false
