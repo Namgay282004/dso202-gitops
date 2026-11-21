@@ -1,0 +1,25 @@
+# =============================================================================
+# File        : environments/dev/values.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV - GitOps environment configuration
+# Purpose     : Defines the development environment overrides.
+# =============================================================================
+
+existingSecret: tasktracker-credentials
+
+database:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+
+backend:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+
+frontend:
+  replicaCount: 1
+  image:
+    tag: "1.0"
+  service:
+    nodePort: 30080
