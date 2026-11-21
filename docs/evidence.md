@@ -495,3 +495,488 @@ credentials and private key material in the public repository.
 They are not a guarantee that every possible secret format has
 been detected.
 
+
+---
+
+## Task 2 — Install Argo CD Declaratively
+
+### 1. Objective
+
+Install Argo CD using a version-controlled Kustomize configuration
+with a pinned upstream release and local configuration patches.
+
+Mapped descriptors: 4.1.2, 4.2.1, Unit III 3.1.4.
+Learning outcomes: LO 6 and LO 7.
+
+### 2. Declarative bootstrap configuration
+
+| File | Purpose |
+|---|---|
+| bootstrap/argocd/namespace.yaml | Creates the argocd namespace |
+| bootstrap/argocd/kustomization.yaml | References the pinned Argo CD v3.5.6 installation |
+| bootstrap/argocd/argocd-cm-patch.yaml | Configures reconciliation, reviewer login and Application health |
+| bootstrap/argocd/argocd-rbac-cm-patch.yaml | Defines the restricted reviewer permissions and empty default policy |
+
+The upstream installation manifest is pinned to:
+
+https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.6/manifests/install.yaml
+
+### 3. Kustomize rendering verification
+
+Command:
+
+```bash
+kubectl kustomize bootstrap/argocd > /tmp/argocd-rendered.yaml
+wc -l /tmp/argocd-rendered.yaml
+```
+
+Actual output:
+
+```text
+34132 /tmp/argocd-rendered.yaml
+```
+
+#### 3.1 Rendered workload kinds
+
+Command:
+
+```bash
+grep -E '^kind: (Deployment|StatefulSet)$' /tmp/argocd-rendered.yaml
+```
+
+Actual output:
+
+```text
+kind: Deployment
+kind: Deployment
+kind: Deployment
+kind: Deployment
+kind: Deployment
+kind: Deployment
+kind: StatefulSet
+```
+
+Workload count:
+
+```bash
+grep -E '^kind: (Deployment|StatefulSet)$' \
+  /tmp/argocd-rendered.yaml | sort | uniq -c
+```
+
+```text
+      6 kind: Deployment
+      1 kind: StatefulSet
+```
+
+Result: PASS. Six Deployments and one StatefulSet were rendered.
+
+#### 3.2 Rendered container images
+
+Command:
+
+```bash
+grep 'image:' /tmp/argocd-rendered.yaml | sort -u
+```
+
+Actual output:
+
+```text
+        image: ghcr.io/dexidp/dex:v2.45.1
+        image: public.ecr.aws/docker/library/redis:8.2.3-alpine
+        image: quay.io/argoproj/argocd:v3.5.6
+```
+
+Result: PASS. All three images use explicit version tags and the
+expected image registries. None is retrieved from Docker Hub.
+
+#### 3.3 Namespace verification
+
+Command:
+
+```bash
+grep -E '^  namespace:' \
+  /tmp/argocd-rendered.yaml | sort | uniq -c
+```
+
+Actual output:
+
+```text
+     59   namespace: argocd
+```
+
+All namespace declarations matched by the command reference argocd.
+
+#### 3.4 Rendered configuration patches
+
+Actual output:
+
+```yaml
+accounts.reviewer: login
+resource.customizations.health.argoproj.io_Application: |
+timeout.reconciliation: 60s
+timeout.reconciliation.jitter: 10s
+```
+
+Rendered RBAC configuration excerpt:
+
+```text
+p, reviewer, applications, get, dso202/*, allow
+p, reviewer, projects, get, dso202, allow
+policy.default: ""
+```
+
+Result: PASS. The expected configuration patches are present.
+
+### 4. Server-side installation
+
+Installation command:
+
+```bash
+kubectl apply -k bootstrap/argocd \
+  --server-side --force-conflicts
+```
+
+Server-side apply was used because the ApplicationSet CRD exceeds
+the 262144-byte annotation size limit associated with ordinary
+client-side apply.
+
+The installation was verified through Deployment availability,
+StatefulSet readiness, running Pods and registered CRDs.
+
+### 5. Workload readiness verification
+
+Command:
+
+```bash
+kubectl wait --for=condition=Available deployment --all \
+  -n argocd --timeout=300s
+```
+
+Final successful output:
+
+```text
+deployment.apps/argocd-applicationset-controller condition met
+deployment.apps/argocd-dex-server condition met
+deployment.apps/argocd-notifications-controller condition met
+deployment.apps/argocd-redis condition met
+deployment.apps/argocd-repo-server condition met
+deployment.apps/argocd-server condition met
+```
+
+StatefulSet verification:
+
+```bash
+kubectl rollout status \
+  statefulset/argocd-application-controller \
+  -n argocd --timeout=300s
+```
+
+Actual output:
+
+```text
+partitioned roll out complete: 1 new pods have been updated...
+```
+
+#### 5.1 Final Pod status
+
+Command:
+
+```bash
+kubectl get pods -n argocd
+```
+
+Actual output:
+
+```text
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0          19m
+argocd-applicationset-controller-58bb5c7479-48nwb   1/1     Running   0          19m
+argocd-dex-server-dd6b85d9c-hwj74                   1/1     Running   0          19m
+argocd-notifications-controller-6b85c65458-qts6z    1/1     Running   0          19m
+argocd-redis-869b85489d-7f9wl                       1/1     Running   0          19m
+argocd-repo-server-5bf66565cd-98k2t                 1/1     Running   0          19m
+argocd-server-7474bb8f76-gtmlm                      1/1     Running   0          19m
+```
+
+Result: PASS. All seven Pods are Running and Ready with zero restarts.
+
+#### 5.2 CRD verification
+
+Command:
+
+```bash
+kubectl get crd | grep argoproj.io
+```
+
+Actual output:
+
+```text
+applications.argoproj.io      2026-11-21T19:10:55Z
+applicationsets.argoproj.io   2026-11-21T19:10:55Z
+appprojects.argoproj.io       2026-11-21T19:10:56Z
+```
+
+Result: PASS. All three required CRDs exist.
+
+### 6. Argo CD access and authentication
+
+The following port-forward command was used:
+
+```bash
+kubectl port-forward --address 127.0.0.1 \
+  svc/argocd-server -n argocd 18080:443
+```
+
+CLI authentication command:
+
+```bash
+argocd login 127.0.0.1:18080 --username admin --insecure
+```
+
+Authentication verification:
+
+```bash
+argocd account get-user-info
+```
+
+Actual output:
+
+```text
+Logged In: true
+Username: admin
+Issuer: argocd
+Groups:
+```
+
+Browser access:
+
+https://127.0.0.1:18080/applications
+
+The self-signed TLS certificate warning was accepted for the local
+installation. No credentials are included in the evidence.
+
+#### 6.1 Authenticated Argo CD dashboard
+
+![Screenshot 08 - Authenticated Argo CD dashboard](../evidences/task-02/08-argocd-ui-login.png)
+
+The dashboard displayed Argo CD v3.5.6 and an empty Applications
+view. This is expected because the root Application and AppProjects
+are created in Task 3.
+
+### 7. Applied configuration verification
+
+Command:
+
+```bash
+kubectl get configmap argocd-cm -n argocd -o yaml \
+  | grep -E 'timeout.reconciliation|accounts.reviewer|resource.customizations.health'
+```
+
+Actual output:
+
+```yaml
+  accounts.reviewer: login
+  resource.customizations.health.argoproj.io_Application: |
+  timeout.reconciliation: 60s
+  timeout.reconciliation.jitter: 10s
+```
+
+Result: PASS. The expected settings are present in the running
+Argo CD installation.
+
+#### 7.1 Applied RBAC configuration
+
+Command:
+
+```bash
+kubectl get configmap argocd-rbac-cm -n argocd -o yaml \
+  | grep -E 'policy.default:|p, reviewer,'
+```
+
+Actual output:
+
+```text
+    p, reviewer, applications, get, dso202/*, allow
+    p, reviewer, projects, get, dso202, allow
+  policy.default: ""
+```
+
+Result: PASS. The configured reviewer permissions match the
+bootstrap policy. Permission enforcement will be tested in Task 6.
+
+### 8. Argo CD version verification
+
+Command:
+
+```bash
+argocd version
+```
+
+Actual output:
+
+```text
+argocd: v3.5.6+c2b1e30
+  BuildDate: 2026-10-20T19:01:52Z
+  GitCommit: c2b1e3017e2cec86b122172e861dcd026453ae44
+  GitTreeState: clean
+  GoVersion: go1.26.10
+  Compiler: gc
+  Platform: linux/amd64
+argocd-server: v3.5.6
+  BuildDate: 2026-10-20T18:33:20Z
+  GitCommit: c2b1e3017e2cec86b122172e861dcd026453ae44
+  GitTreeState: clean
+  GitTag: v3.5.6
+  GoVersion: go1.26.10
+  Compiler: gc
+  Platform: linux/amd64
+  Kustomize Version: v5.8.1 2026-02-09T16:15:27Z
+  Helm Version: v4.2.1+gd591a19
+  Kubectl Version: v0.36.1
+  Jsonnet Version: v0.22.0
+```
+
+Result: PASS. Both the Argo CD client and server use v3.5.6
+and the same Git commit.
+
+### 9. Troubleshooting and environmental observations
+
+#### 9.1 Docker memory allocation
+
+Docker reported 3.675 GiB of available VM memory, below the
+recommended 6 GB allocation.
+
+An unused Kind cluster was stopped without deleting it. This
+released approximately 1.88 GiB of reported container memory.
+
+The Assignment 4 cluster retained all three Ready nodes.
+Docker memory allocation was not changed.
+
+During Argo CD initialization, the three Assignment 4 node
+containers reported the following memory usage:
+
+| Node | Memory usage |
+|---|---:|
+| Control plane | 952.8 MiB |
+| Worker node 1 | 378.7 MiB |
+| Worker node 2 | 325.4 MiB |
+| Total | 1656.9 MiB |
+
+No warning events were reported during the diagnostic check.
+The lower Docker memory allocation remains a consideration
+for subsequent application deployments.
+
+#### 9.2 Initial Deployment readiness timeout
+
+The initial 300-second readiness check timed out while
+container images were still downloading.
+
+Six Pods eventually became Running and Ready, while the Dex
+server remained in PodInitializing.
+
+Pod inspection confirmed:
+
+- The Pod was successfully scheduled on worker-node-2.
+- The copyutil init container completed with exit code 0.
+- The Dex container image was still downloading.
+- No container restarts or warning events were reported.
+
+The final Kubernetes events recorded these image pull durations:
+
+| Image | Pull duration |
+|---|---|
+| Argo CD v3.5.6 (Dex init container) | 4m25.589s |
+| Redis 8.2.3-alpine | 56.022s |
+| Dex v2.45.1 | 11m30.238s |
+
+Corrective action:
+
+```bash
+kubectl wait --for=condition=Available \
+  deployment/argocd-dex-server \
+  -n argocd --timeout=600s
+```
+
+Actual output:
+
+```text
+deployment.apps/argocd-dex-server condition met
+```
+
+The final readiness check confirmed all seven Pods were
+Running and Ready with zero restarts.
+
+No manifest changes, Pod deletion or cluster recreation
+were required.
+
+#### 9.3 Local port conflicts
+
+The original local port 8080 was occupied by the existing
+model-router Docker container.
+
+```text
+model-router    0.0.0.0:8080->80/tcp
+```
+
+The alternative port 8081 was also occupied by a docker-proxy
+process.
+
+The following ports were checked:
+
+```text
+Port 8080: OCCUPIED
+Port 8081: OCCUPIED
+Port 8082: OCCUPIED
+Port 8083: OCCUPIED
+Port 8085: AVAILABLE
+Port 8888: AVAILABLE
+Port 9090: AVAILABLE
+Port 18080: AVAILABLE
+```
+
+Local port 18080 was selected for Argo CD access, preserving
+the existing applications and services.
+
+Binding explicitly to 127.0.0.1 also avoided the IPv6
+listener error.
+
+This change affects only local port forwarding. It does not
+modify the Kubernetes Service, Argo CD manifests or GitOps
+architecture.
+
+### 10. Task 2 verification summary
+
+| Requirement | Result |
+|---|---|
+| Version-controlled Kustomize bootstrap | PASS |
+| Pinned Argo CD release v3.5.6 | PASS |
+| Six rendered Deployments | PASS |
+| One rendered StatefulSet | PASS |
+| Expected container images | PASS |
+| Server-side installation | PASS |
+| Seven Running and Ready Pods | PASS |
+| Three required CRDs | PASS |
+| CLI authentication | PASS |
+| Browser authentication | PASS |
+| Applied ConfigMap settings | PASS |
+| Applied reviewer RBAC configuration | PASS |
+| Client and server version verification | PASS |
+| Required authenticated UI screenshot | PASS |
+
+### 11. Conclusion
+
+Argo CD v3.5.6 was installed declaratively using Kustomize
+and server-side apply on the existing dso202-gitops Kind
+cluster.
+
+All seven components are healthy, the required CRDs exist,
+and the local configuration patches are present.
+
+Both CLI and browser authentication were verified.
+The initial image download delay and local port conflicts
+were resolved without modifying the installation or
+disrupting existing applications.
+
+The Argo CD installation is ready for Task 3, which introduces
+AppProjects and the root Application.
+
