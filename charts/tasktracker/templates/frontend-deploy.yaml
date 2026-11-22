@@ -1,9 +1,12 @@
+
 # =============================================================================
 # File        : charts/tasktracker/templates/frontend-deploy.yaml
 # Assignment  : DSO202 Assignment 4
 # Descriptor  : Unit IV 4.3.2, 4.3.3 - Sync waves and health checks
-# Purpose     : Deploys the frontend in sync wave 2 with NodePort access.
+# Purpose     : Deploys the frontend in sync wave 2 with NodePort access
+#               and an Nginx reverse proxy for backend API requests.
 # =============================================================================
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,6 +15,7 @@ metadata:
     {{- include "tasktracker.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "2"
+
 spec:
   replicas: {{ .Values.frontend.replicaCount }}
   progressDeadlineSeconds: 120
@@ -32,8 +36,14 @@ spec:
       labels:
         tier: frontend
         app.kubernetes.io/name: {{ .Chart.Name }}
+
       annotations:
+        # Restart the frontend when application configuration changes.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+
+        # Restart the frontend when the Nginx proxy configuration changes.
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/frontend-nginx-config.yaml") . | sha256sum }}
+
     spec:
       containers:
         - name: frontend
@@ -44,9 +54,17 @@ spec:
             - name: http
               containerPort: {{ .Values.frontend.service.targetPort }}
 
+          # Application configuration.
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-frontend-config
+
+          # Mount the custom Nginx configuration for API proxying.
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
 
           readinessProbe:
             httpGet:
@@ -60,6 +78,12 @@ spec:
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
 
+      # Custom Nginx configuration supplied through a ConfigMap.
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ .Release.Name }}-frontend-nginx-config
+
 ---
 apiVersion: v1
 kind: Service
@@ -69,6 +93,7 @@ metadata:
     {{- include "tasktracker.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "2"
+
 spec:
   type: {{ .Values.frontend.service.type }}
 
