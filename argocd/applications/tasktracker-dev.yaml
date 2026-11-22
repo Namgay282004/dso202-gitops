@@ -1,0 +1,41 @@
+# =============================================================================
+# File       : argocd/applications/tasktracker-dev.yaml
+# Assignment : DSO202 Assignment 4
+# Purpose    : Deploy Task Tracker to dev with automated GitOps reconciliation.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tasktracker-dev
+  namespace: argocd
+  labels:
+    dso202/environment: dev
+  annotations:
+    # Workload wave 0 follows the platform layer in wave -1.
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: dso202
+  source:
+    repoURL: https://github.com/Namgay282004/dso202-gitops.git
+    # Development follows the latest commit on main.
+    targetRevision: main
+    path: charts/tasktracker
+    helm:
+      releaseName: tasktracker
+      valueFiles:
+        - ../../environments/dev/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,38 @@
+# =============================================================================
+# File       : argocd/applications/tasktracker-staging.yaml
+# Assignment : DSO202 Assignment 4
+# Purpose    : Deploy Task Tracker to staging using an approved, tagged release.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tasktracker-staging
+  namespace: argocd
+  labels:
+    dso202/environment: staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: dso202
+  source:
+    repoURL: https://github.com/Namgay282004/dso202-gitops.git
+    # Staging stays pinned to the baseline tag until explicitly promoted.
+    targetRevision: v1.0.0
+    path: charts/tasktracker
+    helm:
+      releaseName: tasktracker
+      valueFiles:
+        - ../../environments/staging/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-staging
+  # No automated policy: deployment requires a manual sync.
+  syncPolicy:
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
