@@ -19,7 +19,7 @@ spec:
   source:
     repoURL: https://github.com/Namgay282004/dso202-gitops.git
     # Staging stays pinned to the baseline tag until explicitly promoted.
-    targetRevision: v1.0.0
+    targetRevision: v1.1.0
     path: charts/tasktracker
     helm:
       releaseName: tasktracker
