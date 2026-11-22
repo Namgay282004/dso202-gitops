@@ -1546,3 +1546,898 @@ Application management required for the following tasks.
 From this point onward, new Applications and AppProjects are introduced
 through Git rather than being created manually.
 
+
+---
+
+## Task 4 — Sealed Secrets and Platform Applications
+
+### 4.1 Objective
+
+Deploy the Sealed Secrets controller through GitOps, securely encrypt
+environment-specific database credentials, and establish the development
+and staging platform environments without committing plaintext secrets
+or private sealing keys to Git.
+
+Implementation and verification date: 22 November 2026.
+
+### 4.2 Environment and tool verification
+
+| Component | Verified configuration |
+|---|---|
+| Kubernetes context | kind-dso202-gitops |
+| Argo CD version | v3.5.6 |
+| kubeseal version | 0.40.0 |
+| Sealed Secrets Helm chart | 2.20.0 |
+| Sealed Secrets controller | 0.40.0 |
+| Controller namespace | sealed-secrets |
+| Controller Application sync wave | -2 |
+| Platform Application sync wave | -1 |
+| Controller Helm repository | https://bitnami.github.io/sealed-secrets |
+| Git repository | https://github.com/Namgay282004/dso202-gitops.git |
+
+The existing Kubernetes cluster and Argo CD installation were reused.
+
+Before starting Task 4, a duplicate Task 3 evidence section was removed
+without changing the existing implementation or losing evidence.
+
+Documentation correction commit:
+
+    951da70 docs: remove duplicate Task 3 evidence section
+
+### 4.3 Sealed Secrets controller Application
+
+The controller Application was defined in:
+
+    argocd/applications/sealed-secrets.yaml
+
+The configuration follows Listing 9 of the assignment guide.
+
+| Configuration | Value |
+|---|---|
+| Application name | sealed-secrets |
+| AppProject | platform |
+| Helm chart | sealed-secrets |
+| Chart revision | 2.20.0 |
+| Helm release name | sealed-secrets |
+| fullnameOverride | sealed-secrets-controller |
+| Destination namespace | sealed-secrets |
+| Sync wave | -2 |
+| Automated synchronization | Enabled |
+| Pruning | Enabled |
+| Self-healing | Enabled |
+| CreateNamespace | true |
+| Retry limit | 5 |
+
+Server-side dry-run validation passed.
+
+The Helm rendering contained the following resource kinds:
+
+    1 ClusterRole
+    1 ClusterRoleBinding
+    1 CustomResourceDefinition
+    1 Deployment
+    2 Role
+    2 RoleBinding
+    2 Service
+    1 ServiceAccount
+
+The controller image was verified as:
+
+    docker.io/bitnami/sealed-secrets-controller:0.40.0
+
+The pinned chart and controller versions satisfy the assignment
+version requirements.
+
+### 4.4 Official Step 1 — Controller installation evidence
+
+The controller Application was committed and pushed to Git.
+
+Commit:
+
+    b952eb2 feat: deploy pinned Sealed Secrets controller through GitOps
+
+Full revision:
+
+    b952eb2dc287f944a956c1ba7603697b5b1a01ba
+
+The root Application automatically discovered and created the
+sealed-secrets Application.
+
+Command:
+
+    kubectl get applications -n argocd
+
+Output:
+
+    NAME             SYNC STATUS   HEALTH STATUS
+    root             Synced        Healthy
+    sealed-secrets   Synced        Healthy
+
+Command:
+
+    kubectl get pods -n sealed-secrets
+
+Recorded output:
+
+    NAME                                        READY   STATUS    RESTARTS
+    sealed-secrets-controller-8b5ffdf69-np7ch   1/1     Running   0
+
+Command:
+
+    kubectl get crd sealedsecrets.bitnami.com
+
+Recorded result:
+
+    NAME                        CREATED AT
+    sealedsecrets.bitnami.com   2026-11-22T06:48:15Z
+
+Additional verification:
+
+- Controller Deployment: 1/1 Ready.
+- Controller Deployment rollout: successful.
+- SealedSecret CRD condition: Established.
+- Application synchronization operation: Succeeded.
+- Synchronization duration: 5 seconds.
+- Controller namespace automatically created.
+- No manual controller Application creation was performed.
+
+The root Application managed the controller installation through Git.
+
+### 4.5 Official Step 2 — Private sealing key backup
+
+The controller generated a Kubernetes TLS Secret containing its
+sealing key and certificate.
+
+The sealing key was backed up before any credentials were encrypted.
+
+Commands:
+
+    mkdir -p ../dso202-keys
+    chmod 700 ../dso202-keys
+
+    kubectl get secret -n sealed-secrets \
+      -l sealedsecrets.bitnami.com/sealed-secrets-key \
+      -o yaml > ../dso202-keys/sealing-key.backup.yaml
+
+    chmod 600 ../dso202-keys/sealing-key.backup.yaml
+
+The backup was created using a restrictive umask.
+
+Command:
+
+    ls -l ../dso202-keys/
+
+Recorded output:
+
+    total 8
+    -rw------- 1 namgaywangchuk namgaywangchuk 7089 Nov 22 12:51 sealing-key.backup.yaml
+
+Verification summary:
+
+| Check | Result |
+|---|---|
+| Backup directory outside Git repository | PASS |
+| Backup directory permissions | 700 |
+| Backup file permissions | 600 |
+| Backup file size | 7089 bytes |
+| Backup file is non-empty | PASS |
+| Private key field exists | PASS |
+| Certificate field exists | PASS |
+| Private key backup tracked by Git | No |
+| Private key contents displayed | No |
+
+The backup is stored outside the public repository.
+
+The private key and certificate contents are intentionally excluded
+from this evidence document.
+
+Actual key restoration and recovery will be demonstrated in Task 9.
+
+### 4.6 Official Step 3 — Plaintext credential preparation
+
+Two temporary credential input files were created:
+
+    secrets-plain/dev.env
+    secrets-plain/staging.env
+
+Both contained the four required credential keys:
+
+    DB_USER
+    DB_PASSWORD
+    POSTGRES_USER
+    POSTGRES_PASSWORD
+
+The files were protected using permission 600 and excluded
+from Git through .gitignore.
+
+Validation results:
+
+| Check | Development | Staging |
+|---|---|---|
+| File exists | PASS | PASS |
+| Valid KEY=value format | PASS | PASS |
+| Exactly four required keys | PASS | PASS |
+| Non-empty credential values | PASS | PASS |
+| Example placeholders replaced | PASS | PASS |
+| DB_USER equals POSTGRES_USER | PASS | PASS |
+| DB_PASSWORD equals POSTGRES_PASSWORD | PASS | PASS |
+| File permissions are 600 | PASS | PASS |
+| Plaintext file ignored by Git | PASS | PASS |
+
+The initial credential validation detected password mismatches
+within both environments. The credentials were corrected and
+the complete validation was repeated successfully.
+
+Environment isolation verification:
+
+    PASS: Development and staging passwords differ.
+
+Final credential preparation result:
+
+    PASS: All credential validation checks passed.
+    No credential values were displayed.
+
+### 4.7 Official Step 4 — SealedSecret generation
+
+The controller namespace was configured using:
+
+    export SEALED_SECRETS_CONTROLLER_NAMESPACE=sealed-secrets
+
+The controller was running and healthy.
+
+The public sealing certificate was successfully retrieved.
+
+Certificate metadata:
+
+    notBefore=Nov 22 06:49:27 2026 GMT
+    notAfter=Nov 19 06:49:27 2036 GMT
+
+Development encryption command:
+
+    kubectl create secret generic tasktracker-credentials \
+      --namespace dso202-dev \
+      --from-env-file=secrets-plain/dev.env \
+      --dry-run=client -o yaml \
+      | kubeseal --format yaml \
+      > platform/dev/tasktracker-credentials.sealed.yaml
+
+Staging encryption command:
+
+    kubectl create secret generic tasktracker-credentials \
+      --namespace dso202-staging \
+      --from-env-file=secrets-plain/staging.env \
+      --dry-run=client -o yaml \
+      | kubeseal --format yaml \
+      > platform/staging/tasktracker-credentials.sealed.yaml
+
+The generation pipelines used pipefail to detect failures.
+
+Recorded generation results:
+
+    PASS: Development SealedSecret generated.
+    PASS: Staging SealedSecret generated.
+
+Both generated files were approximately 3.8 KB.
+
+Both files contain real encrypted credential values generated
+by kubeseal, rather than the abbreviated example ciphertext
+shown in Listing 12.
+
+The generated manifest headers identify the assignment,
+file path, descriptor and purpose.
+
+### 4.8 SealedSecret encryption and security validation
+
+Commands:
+
+    kubeseal --validate \
+      < platform/dev/tasktracker-credentials.sealed.yaml
+
+    kubeseal --validate \
+      < platform/staging/tasktracker-credentials.sealed.yaml
+
+Recorded results:
+
+    PASS: Development SealedSecret is valid.
+    PASS: Staging SealedSecret is valid.
+
+Additional automated checks:
+
+| Check | Development | Staging |
+|---|---|---|
+| Correct resource kind | PASS | PASS |
+| Correct API version | PASS | PASS |
+| Correct Secret and template names | PASS | PASS |
+| Correct metadata and template namespace | PASS | PASS |
+| Exactly four encrypted credential keys | PASS | PASS |
+| Valid ciphertext structure | PASS | PASS |
+| No plaintext Secret resource | PASS | PASS |
+| No plaintext Secret data fields | PASS | PASS |
+| No Listing 12 placeholder ciphertext | PASS | PASS |
+| Default strict encryption scope | PASS | PASS |
+| Actual plaintext password absent | PASS | PASS |
+
+Environment ciphertext comparison:
+
+    PASS: Development and staging ciphertext values differ.
+
+Final validation result:
+
+    PASS: All SealedSecret security checks passed.
+
+### 4.9 Plaintext credential removal
+
+After successful encryption and validation, the temporary plaintext
+input files were removed.
+
+Command:
+
+    rm secrets-plain/dev.env secrets-plain/staging.env
+
+Verification commands:
+
+    find secrets-plain -type f
+    stat -c '%a %n' ../dso202-keys/sealing-key.backup.yaml
+
+Recorded results:
+
+    PASS: Both plaintext input files removed.
+    600 ../dso202-keys/sealing-key.backup.yaml
+
+The find command returned no files.
+
+The encrypted manifests remained available for GitOps deployment.
+
+No plaintext Kubernetes Secret manifest was written to disk
+by the encryption pipelines.
+
+### 4.10 Official Step 5 — Platform manifest preparation
+
+The following platform directory structure was verified:
+
+    platform/
+      dev/
+        namespace.yaml
+        quota-and-limits.yaml
+        rbac.yaml
+        tasktracker-credentials.sealed.yaml
+      staging/
+        namespace.yaml
+        quota-and-limits.yaml
+        rbac.yaml
+        tasktracker-credentials.sealed.yaml
+
+The two platform Applications were created according to Listing 10:
+
+    argocd/applications/platform-dev.yaml
+    argocd/applications/platform-staging.yaml
+
+The namespace manifests were created according to Listing 11.
+
+| Configuration | Development | Staging |
+|---|---|---|
+| Application name | platform-dev | platform-staging |
+| AppProject | platform | platform |
+| Source path | platform/dev | platform/staging |
+| Git target revision | main | main |
+| Destination namespace | dso202-dev | dso202-staging |
+| Sync wave | -1 | -1 |
+| Automated sync | Enabled | Enabled |
+| Prune | true | true |
+| Self-heal | true | true |
+| SkipDryRunOnMissingResource | true | true |
+| Retry limit | 5 | 5 |
+| Initial retry duration | 10s | 10s |
+| Backoff factor | 2 | 2 |
+| Maximum retry duration | 3m | 3m |
+
+The namespace labels identify assignment 04, the corresponding
+environment, and Argo CD as the managing component.
+
+Both namespace manifests contain:
+
+    argocd.argoproj.io/sync-options: Prune=false
+
+This protects the namespaces from automatic Argo CD pruning.
+
+Each platform directory declares six resources:
+
+    kind: LimitRange
+    kind: Namespace
+    kind: ResourceQuota
+    kind: Role
+    kind: RoleBinding
+    kind: SealedSecret
+
+The regular Kubernetes Secret is not declared in Git.
+It is generated by the Sealed Secrets controller.
+
+### 4.11 Platform manifest dry-run validation
+
+Namespace validation commands:
+
+    kubectl apply --dry-run=server -f platform/dev/namespace.yaml
+    kubectl apply --dry-run=server -f platform/staging/namespace.yaml
+
+Output:
+
+    namespace/dso202-dev created (server dry run)
+    namespace/dso202-staging created (server dry run)
+
+Application validation:
+
+    kubectl apply --dry-run=server \
+      -f argocd/applications/platform-dev.yaml \
+      -f argocd/applications/platform-staging.yaml
+
+Output:
+
+    application.argoproj.io/platform-dev created (server dry run)
+    application.argoproj.io/platform-staging created (server dry run)
+
+Individual and combined Application dry-run validations passed.
+
+Kubernetes reported a finalizer naming warning. The standard Argo CD
+resource finalizer was retained because this was a warning rather
+than a validation failure.
+
+No live platform resources were created by the dry-run commands.
+
+### 4.12 Platform Git commit and deployment
+
+Final pre-commit security results:
+
+    PASS: No matching sensitive files tracked.
+    PASS: No plaintext Secret manifests found.
+
+Six new configuration files were staged explicitly:
+
+    argocd/applications/platform-dev.yaml
+    argocd/applications/platform-staging.yaml
+    platform/dev/namespace.yaml
+    platform/dev/tasktracker-credentials.sealed.yaml
+    platform/staging/namespace.yaml
+    platform/staging/tasktracker-credentials.sealed.yaml
+
+The staged whitespace validation returned no output.
+
+Commit summary:
+
+    6 files changed, 190 insertions(+)
+
+Commit:
+
+    e91aee8 feat: deploy development and staging platform resources with sealed credentials
+
+Full deployment revision:
+
+    e91aee8ab82ac1542ac9de631786b4fbe1bd0a50
+
+The local and remote Git revisions matched.
+
+The root Application automatically detected the new Git revision
+and created both platform Applications.
+
+Observed reconciliation sequence:
+
+| Stage | Observation |
+|---|---|
+| New revision detected | Root OutOfSync |
+| Platform Applications absent | Missing |
+| Root creates platform Applications | Created |
+| Platform synchronization | Progressing |
+| Final state | Synced and Healthy |
+
+No manual platform Application or namespace creation was performed.
+
+### 4.13 Official Step 6 — Application and namespace evidence
+
+Command:
+
+    kubectl get applications -n argocd
+
+Output:
+
+    NAME               SYNC STATUS   HEALTH STATUS
+    platform-dev       Synced        Healthy
+    platform-staging   Synced        Healthy
+    root               Synced        Healthy
+    sealed-secrets     Synced        Healthy
+
+Command:
+
+    kubectl get namespaces | grep dso202
+
+Output:
+
+    dso202-dev           Active   91s
+    dso202-staging       Active   90s
+
+Application synchronization verification:
+
+    argocd app wait platform-dev \
+      --sync --health --operation --timeout 300
+
+    argocd app wait platform-staging \
+      --sync --health --operation --timeout 300
+
+    argocd app wait root \
+      --sync --health --operation --timeout 300
+
+All three wait commands succeeded.
+
+| Application | Sync status | Health | Operation |
+|---|---|---|---|
+| root | Synced | Healthy | Succeeded |
+| platform-dev | Synced | Healthy | Succeeded |
+| platform-staging | Synced | Healthy | Succeeded |
+
+Root synchronization operation:
+
+    Start:    2026-11-22 13:05:24 +0600
+    Finished: 2026-11-22 13:05:29 +0600
+    Duration: 5s
+    Phase:    Succeeded
+
+Development platform synchronization operation:
+
+    Start:    2026-11-22 13:05:33 +0600
+    Finished: 2026-11-22 13:05:33 +0600
+    Phase:    Succeeded
+
+Staging platform synchronization operation:
+
+    Start:    2026-11-22 13:05:34 +0600
+    Finished: 2026-11-22 13:05:34 +0600
+    Phase:    Succeeded
+
+All twelve declared platform resources were synchronized.
+
+### 4.14 Development SealedSecret and generated Secret
+
+Command:
+
+    kubectl get sealedsecret -n dso202-dev
+
+Output:
+
+    NAME                      STATUS   SYNCED   AGE
+    tasktracker-credentials            True     95s
+
+Command:
+
+    kubectl describe secret tasktracker-credentials -n dso202-dev
+
+Output:
+
+    Name:         tasktracker-credentials
+    Namespace:    dso202-dev
+    Labels:       <none>
+    Annotations:  <none>
+
+    Type:  Opaque
+
+    Data
+    ====
+    DB_PASSWORD:        48 bytes
+    DB_USER:            15 bytes
+    POSTGRES_PASSWORD:  48 bytes
+    POSTGRES_USER:      15 bytes
+
+All four required credential keys exist.
+
+The describe command displayed only key names and sizes,
+not credential values.
+
+### 4.15 Development ResourceQuota, LimitRange and RBAC
+
+Command:
+
+    kubectl get resourcequota,limitrange -n dso202-dev
+
+Recorded output:
+
+    resourcequota/mem-cpu-quota
+    requests.cpu:    0/2
+    requests.memory: 0/2Gi
+    limits.cpu:      0/4
+    limits.memory:   0/4Gi
+
+    limitrange/mem-cpu-limits
+    Created: 2026-11-22T07:05:32Z
+
+Command:
+
+    kubectl get role,rolebinding -n dso202-dev
+
+Recorded output:
+
+    role.rbac.authorization.k8s.io/tasktracker-reader
+    Created: 2026-11-22T07:05:32Z
+
+    rolebinding.rbac.authorization.k8s.io/tasktracker-reader-binding
+    Role: Role/tasktracker-reader
+
+All development platform restrictions were present.
+
+### 4.16 Staging SealedSecret and generated Secret
+
+Command:
+
+    kubectl get sealedsecret -n dso202-staging
+
+Output:
+
+    NAME                      STATUS   SYNCED   AGE
+    tasktracker-credentials            True     100s
+
+Command:
+
+    kubectl describe secret tasktracker-credentials -n dso202-staging
+
+Output:
+
+    Name:         tasktracker-credentials
+    Namespace:    dso202-staging
+    Labels:       <none>
+    Annotations:  <none>
+
+    Type:  Opaque
+
+    Data
+    ====
+    DB_PASSWORD:        48 bytes
+    DB_USER:            19 bytes
+    POSTGRES_PASSWORD:  48 bytes
+    POSTGRES_USER:      19 bytes
+
+All four required credential keys exist.
+
+Development and staging use independently prepared credentials.
+
+### 4.17 Staging ResourceQuota, LimitRange and RBAC
+
+Command:
+
+    kubectl get resourcequota,limitrange -n dso202-staging
+
+Recorded output:
+
+    resourcequota/mem-cpu-quota
+    requests.cpu:    0/2
+    requests.memory: 0/2Gi
+    limits.cpu:      0/4
+    limits.memory:   0/4Gi
+
+    limitrange/mem-cpu-limits
+    Created: 2026-11-22T07:05:34Z
+
+Command:
+
+    kubectl get role,rolebinding -n dso202-staging
+
+Recorded output:
+
+    role.rbac.authorization.k8s.io/tasktracker-reader
+    Created: 2026-11-22T07:05:34Z
+
+    rolebinding.rbac.authorization.k8s.io/tasktracker-reader-binding
+    Role: Role/tasktracker-reader
+
+All staging platform restrictions were present.
+
+Resource consumption was zero in both environments because
+the application workloads had not yet been deployed.
+
+### 4.18 SealedSecret reconciliation and ownership
+
+Development condition:
+
+    [{"lastTransitionTime":"2026-11-22T07:05:33Z","lastUpdateTime":"2026-11-22T07:05:33Z","status":"True","type":"Synced"}]
+
+Staging condition:
+
+    [{"lastTransitionTime":"2026-11-22T07:05:34Z","lastUpdateTime":"2026-11-22T07:05:34Z","status":"True","type":"Synced"}]
+
+Command:
+
+    kubectl get sealedsecrets -A
+
+Output:
+
+    NAMESPACE        NAME                      STATUS   SYNCED   AGE
+    dso202-dev       tasktracker-credentials            True     2m11s
+    dso202-staging   tasktracker-credentials            True     2m10s
+
+Secret ownership was verified using the metadata.ownerReferences
+field of each generated Kubernetes Secret.
+
+Recorded output:
+
+    ===== dev SECRET OWNERSHIP =====
+    SealedSecret tasktracker-credentials
+
+    ===== staging SECRET OWNERSHIP =====
+    SealedSecret tasktracker-credentials
+
+This confirms that both Kubernetes Secrets are owned by their
+corresponding SealedSecret resources.
+
+### 4.19 Official Step 7 — Credential history security searches
+
+The four credential keys in each namespace were retrieved into
+a Python process for validation. Their base64-encoded values
+were decoded in memory without displaying or saving the values
+to files.
+
+Each distinct credential value was searched using the assignment's
+required Git history search:
+
+    git log -p --all -S'<value>'
+
+The placeholder above represents the search value and is not
+an actual credential.
+
+The script captured the Git output without displaying matching
+patches or credential values.
+
+Recorded output:
+
+    ===== DEV SECRET VALIDATION =====
+    PASS: DB_USER matches POSTGRES_USER
+    PASS: DB_PASSWORD matches POSTGRES_PASSWORD
+
+    ===== STAGING SECRET VALIDATION =====
+    PASS: DB_USER matches POSTGRES_USER
+    PASS: DB_PASSWORD matches POSTGRES_PASSWORD
+
+    ===== ENVIRONMENT ISOLATION =====
+    PASS: Development and staging passwords differ.
+
+    ===== GIT HISTORY SECURITY SEARCH =====
+    PASS: dev/DB_PASSWORD, dev/POSTGRES_PASSWORD
+    PASS: dev/DB_USER, dev/POSTGRES_USER
+    PASS: staging/DB_PASSWORD, staging/POSTGRES_PASSWORD
+    PASS: staging/DB_USER, staging/POSTGRES_USER
+
+    Distinct credential values tested: 4
+
+    ===== FINAL RESULT =====
+    PASS: All credential history searches returned no matches.
+    No credential values were displayed or saved to files by the script.
+
+| Environment | Credential keys tested | Search result |
+|---|---|---|
+| Development | DB_USER, POSTGRES_USER | No matches |
+| Development | DB_PASSWORD, POSTGRES_PASSWORD | No matches |
+| Staging | DB_USER, POSTGRES_USER | No matches |
+| Staging | DB_PASSWORD, POSTGRES_PASSWORD | No matches |
+
+All four distinct values passed the required history searches.
+
+These results apply to the tested credential values and the Git
+history reachable through the local repository refs at the time
+of verification.
+
+### 4.20 Final repository and security verification
+
+Command:
+
+    git status --short --ignored
+
+Output:
+
+    ?? evidences/task-01/
+
+The plaintext input files had already been removed.
+
+Command:
+
+    find secrets-plain -type f
+
+Result:
+
+    No files returned.
+
+Command:
+
+    ls -l ../dso202-keys/
+
+Output:
+
+    total 8
+    -rw------- 1 namgaywangchuk namgaywangchuk 7089 Nov 22 12:51 sealing-key.backup.yaml
+
+Command:
+
+    git ls-files platform/ argocd/applications/
+
+Output:
+
+    argocd/applications/platform-dev.yaml
+    argocd/applications/platform-staging.yaml
+    argocd/applications/sealed-secrets.yaml
+    platform/dev/namespace.yaml
+    platform/dev/quota-and-limits.yaml
+    platform/dev/rbac.yaml
+    platform/dev/tasktracker-credentials.sealed.yaml
+    platform/staging/namespace.yaml
+    platform/staging/quota-and-limits.yaml
+    platform/staging/rbac.yaml
+    platform/staging/tasktracker-credentials.sealed.yaml
+
+Local deployment revision:
+
+    e91aee8ab82ac1542ac9de631786b4fbe1bd0a50
+
+Remote deployment revision:
+
+    e91aee8ab82ac1542ac9de631786b4fbe1bd0a50
+
+The local and remote revisions matched before the evidence
+documentation commit.
+
+### 4.21 Troubleshooting and observations
+
+| Observation | Resolution |
+|---|---|
+| Initial password mismatch within each environment | Corrected credentials and repeated validation successfully |
+| Kubernetes finalizer naming warning | Retained the standard Argo CD finalizer |
+| Initial root Application OutOfSync | Allowed automatic GitOps reconciliation |
+| Platform Applications initially Missing | Root Application created them automatically |
+| Temporary platform health Progressing | Waited for synchronization to complete |
+| Port 18080 already in use | Reused the existing functional Argo CD connection |
+| Zero quota consumption | Expected because workloads are deployed in Task 5 |
+
+No unnecessary cluster recreation or manual platform deployment
+was performed.
+
+### 4.22 Official evidence requirement mapping
+
+| Required evidence | Location |
+|---|---|
+| Step 1 controller installation output | Section 4.4 |
+| Backup file existence and permissions | Sections 4.5 and 4.20 |
+| Step 6 Application and namespace output | Section 4.13 |
+| Development SealedSecret and Secret | Section 4.14 |
+| Development quota and limits | Section 4.15 |
+| Staging SealedSecret and Secret | Section 4.16 |
+| Staging quota and limits | Section 4.17 |
+| Both platform Applications Synced and Healthy | Section 4.13 |
+| Step 7 credential history searches | Section 4.19 |
+| Git status including ignored files | Section 4.20 |
+| Written answer Q2 | README.md |
+
+Task 4 requires command outputs and written evidence.
+No additional screenshot is required by the Task 4 evidence list.
+
+### 4.23 Task 4 summary
+
+| Requirement | Result |
+|---|---|
+| Pinned Sealed Secrets controller deployed | PASS |
+| Controller installation managed through GitOps | PASS |
+| Sealing key backed up before encryption | PASS |
+| Private key backup outside Git | PASS |
+| Restrictive backup file permissions | PASS |
+| Development credentials encrypted | PASS |
+| Staging credentials encrypted | PASS |
+| Strict encryption scope used | PASS |
+| Plaintext input files removed | PASS |
+| Development platform automatically deployed | PASS |
+| Staging platform automatically deployed | PASS |
+| Both namespaces Active | PASS |
+| Both SealedSecrets synchronized | PASS |
+| Both generated Secrets contain four keys | PASS |
+| Credential consistency within environments | PASS |
+| Password isolation between environments | PASS |
+| ResourceQuota and LimitRange present | PASS |
+| Role and RoleBinding present | PASS |
+| Four credential history searches returned no matches | PASS |
+| Both platform Applications Synced and Healthy | PASS |
+
+Technical implementation completed successfully.
+
+The cluster is ready for Task 5, where the Task Tracker workload
+Applications will be deployed using the existing platform resources
+and controller-generated credentials.
