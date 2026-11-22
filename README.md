@@ -89,3 +89,56 @@ also be maintained separately from the original machine.
 
 The key restoration and cluster recovery process will be
 demonstrated in Task 9.
+
+
+### Q5 — Rollback, Fix-Forward and Staging Protection
+
+**Question: Why was the Argo CD rollback refused, how was the failed release recovered, and how was staging protected?**
+
+**Answer:**
+
+The backend 1.1 release was introduced through a GitHub pull request.
+After merging, Argo CD automatically attempted to deploy it to development.
+
+The backend failed to start because the required RELEASE_MODE environment
+variable was missing. The Pod entered CrashLoopBackOff, and Argo CD
+reported the development application as Degraded. Kubernetes logs
+confirmed the missing environment variable.
+
+An Argo CD rollback was attempted but refused because automated
+synchronization was enabled. Therefore, recovery was performed through
+a Git revert instead.
+
+The revert restored backend 1.0 through a separate pull request.
+After merging, Argo CD automatically synchronized development,
+and the application returned to Synced and Healthy.
+
+The backend 1.1 release was then corrected using a fix-forward change.
+The required RELEASE_MODE environment variable was set to enabled
+in the Helm configuration. Helm lint and template rendering confirmed
+the corrected configuration before merging.
+
+After the fix-forward merge, development successfully deployed backend
+1.1. The backend connected to the database, both API endpoints returned
+HTTP 200, and the PostSync smoke-test Job succeeded.
+
+The corrected release was tagged as v1.2.0.
+
+Staging was protected because it used a fixed Git tag and manual
+synchronization. While development experienced the failed release,
+staging remained on the stable v1.1.0 release.
+
+A separate pull request promoted staging to v1.2.0. The application
+remained OutOfSync until manual synchronization was performed.
+
+After manual synchronization, staging became Synced and Healthy.
+Backend 1.1 started successfully, the database was connected,
+both API endpoints returned HTTP 200, and the smoke test succeeded.
+
+The staging deployment history contained v1.0.0, v1.1.0, and v1.2.0.
+It did not contain the faulty commit d4102e6. This confirmed that
+the faulty backend release was never deployed to staging.
+
+This exercise demonstrated how Git revert restores a stable state,
+fix-forward corrects failed releases, and manual staging promotion
+prevents unverified changes from reaching staging.
