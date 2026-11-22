@@ -15,7 +15,9 @@ database:
 backend:
   replicaCount: 1
   image:
-    tag: "1.0"
+    tag: "1.1"
+  env:
+    RELEASE_MODE: "enabled"
 
 frontend:
   replicaCount: 1
