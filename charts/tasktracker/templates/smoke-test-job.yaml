@@ -1,0 +1,55 @@
+# =============================================================================
+# File        : charts/tasktracker/templates/smoke-test-job.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.3.2 - sync waves and hooks; 4.3.3 - health checks
+# Purpose     : A PostSync hook that verifies backend and database connectivity.
+#               Argo CD creates this Job after the workloads become Healthy.
+#               A failed Job causes the synchronization operation to fail.
+# Note        : Helm ignores Argo CD hook annotations and renders a normal Job.
+# =============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-smoke-test
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    # Retain the most recent Job until the next synchronization.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: smoke-test
+          image: busybox:1.37
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # GET /api/tasks verifies the backend and database together.
+              for attempt in 1 2 3 4 5 6 7 8 9 10; do
+                if wget -q -T 3 -O - http://tasktracker-backend-service:8080/api/tasks; then
+                  exit 0
+                fi
+                echo "attempt ${attempt} failed"
+                sleep 3
+              done
+              exit 1
