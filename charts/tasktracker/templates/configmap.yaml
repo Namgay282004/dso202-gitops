@@ -40,7 +40,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 data:
-  BACKEND_URL: ""
+  BACKEND_URL: "."
   {{- range $key, $value := .Values.frontend.env }}
   {{ $key }}: {{ $value | toString | quote }}
   {{- end }}

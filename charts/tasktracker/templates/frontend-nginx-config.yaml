@@ -1,3 +1,4 @@
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,7 +10,7 @@ metadata:
 data:
   default.conf: |
     server {
-      listen 80;
+      listen {{ .Values.frontend.service.targetPort }};
       server_name _;
 
       root /usr/share/nginx/html;
