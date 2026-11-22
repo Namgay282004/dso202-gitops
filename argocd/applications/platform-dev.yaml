@@ -1,0 +1,52 @@
+# =============================================================================
+# File        : argocd/applications/platform-dev.yaml
+# Assignment  : DSO202 Assignment 4
+# Descriptor  : Unit IV 4.3.1 - Application CRDs; 4.3.2 - sync policies
+# Purpose     : Delivers the platform objects of the dev environment:
+#               namespace, ResourceQuota, LimitRange, Role, RoleBinding,
+#               and sealed credentials from Task 4.
+# Staging     : The staging Application uses its own name, source path
+#               and destination namespace.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-dev
+  namespace: argocd
+  annotations:
+    # Wave -1: after the Sealed Secrets controller (wave -2),
+    # before the workloads (wave 0).
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/Namgay282004/dso202-gitops.git
+    targetRevision: main
+    # A plain directory of manifests: no chart, no templating.
+    path: platform/dev
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dso202-dev
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      # Allow synchronization if the SealedSecret CRD registration
+      # is not yet visible during the initial dry run.
+      - SkipDryRunOnMissingResource=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
