@@ -2549,3 +2549,81 @@ desired manifests. No AppProject permissions were weakened.
 reconciled drift, staging required manual synchronization, GitOps
 pruned the temporary ConfigMap, and AppProject restrictions prevented
 deployment of an unauthorized resource.
+
+---
+
+## Task 9 — Disaster Recovery and GitOps Rebuild
+
+### Objective
+
+Demonstrate that the Kubernetes cluster can be rebuilt from Git,
+while restoring the original Sealed Secrets encryption key and
+preserving controlled manual synchronization for staging.
+
+### Recovery Procedure
+
+1. Recorded Git revision `441fc8c` and the original cluster state.
+2. Backed up the active Sealed Secrets encryption key outside Git
+   with file permissions `600`.
+3. Deleted and recreated the `dso202-gitops` Kind cluster.
+4. Restored the original encryption key before reinstalling the
+   Sealed Secrets controller.
+5. Reinstalled Argo CD and bootstrapped the root Application from Git.
+6. Verified automatic recovery of the platform and development.
+7. Confirmed staging remained OutOfSync because synchronization
+   was configured as manual.
+8. Manually synchronized staging from the pinned `v1.2.0` release.
+9. Verified application health, APIs, frontend routing, database
+   connectivity, and recovered credentials.
+
+### Recovery Results
+
+| Verification | Result |
+|---|---|
+| Cluster recreated with three Ready nodes | PASS |
+| Original Sealed Secrets key restored | PASS |
+| Argo CD and root Application restored | PASS |
+| All six Applications Synced / Healthy | PASS |
+| Development recovered automatically | PASS |
+| Staging required manual synchronization | PASS |
+| Both databases, backends, and frontends Ready | PASS |
+| Both PostSync smoke-test Jobs completed | PASS |
+| Both `/api/status` endpoints returned HTTP 200 | PASS |
+| Both `/api/tasks` endpoints returned HTTP 200 | PASS |
+| Both frontend pages returned HTTP 200 | PASS |
+| Both frontend API proxies returned HTTP 200 | PASS |
+| Both SealedSecrets synchronized successfully | PASS |
+| Both generated Secrets contained four keys | PASS |
+
+### Recovery Timing
+
+- Rebuild started: 23 November 2026, 13:46:51 (+06:00).
+- Staging manual synchronization: 15:15:57–15:19:41.
+- Staging synchronization duration: **3 minutes 44 seconds**.
+- Elapsed time from rebuild start to staging recovery:
+  approximately **1 hour 32 minutes 50 seconds**, including
+  setup, image downloads, troubleshooting, and manual intervention.
+
+The elapsed time is not a benchmark of fully automated recovery.
+Development recovered automatically, while staging was intentionally
+held until manual synchronization.
+
+### Evidence
+
+Screenshots are stored in `evidences/task-09/`:
+
+- `43`–`44`: Original cluster state and encryption-key backup.
+- `45`–`46`: Cluster recreation and key restoration.
+- `47`–`49`: Argo CD installation and GitOps bootstrap.
+- `50`–`52`: Credentials, development recovery, and staging protection.
+- `53`–`54`: Manual staging synchronization and final application health.
+- `55`–`56`: Backend API, database, and frontend verification.
+- `57`: Restored encryption key and generated credentials.
+
+### Conclusion
+
+The cluster was successfully rebuilt using GitOps. Development
+recovered automatically, staging required deliberate manual
+synchronization, and the original encryption key restored access
+to both environments' credentials. All six Applications finished
+Synced and Healthy.
