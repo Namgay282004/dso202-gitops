@@ -2444,6 +2444,230 @@ and controller-generated credentials.
 
 ---
 
+## Task 5 — Workload Deployment and PostSync Verification
+
+### Objective
+
+Deploy the Task Tracker application in development and staging using
+Argo CD, Helm, health checks, and a PostSync smoke-test Job.
+
+### Implementation
+
+The workload Applications were introduced in commit `7c496e5`.
+
+Development:
+- Application: `tasktracker-dev`
+- Namespace: `dso202-dev`
+- Git revision: `main`
+- Automated synchronization, pruning, and self-healing enabled
+
+Staging:
+- Application: `tasktracker-staging`
+- Namespace: `dso202-staging`
+- Git revision: `v1.2.0` (final approved release)
+- Manual synchronization required
+
+The smoke-test Job was introduced in commit `3b15e6e`
+and uses the Argo CD `PostSync` hook.
+
+It sends an HTTP request to the backend `/api/tasks` endpoint.
+A successful response confirms that the backend can serve the
+request and access the database.
+
+### Verification commands
+
+```bash
+kubectl get applications -n argocd
+kubectl get deployments,statefulsets,jobs -n dso202-dev
+kubectl get deployments,statefulsets,jobs -n dso202-staging
+```
+
+### Observed results — Final verification, 2026-11-23
+
+| Resource | Development | Staging |
+|---|---|---|
+| Argo CD Application | Synced / Healthy | Synced / Healthy |
+| Backend | 1/1 Ready | 1/1 Ready |
+| Frontend | 1/1 Ready | 1/1 Ready |
+| Database | 1/1 Ready | 1/1 Ready |
+| PostSync Job | Complete (23s) | Complete (21s) |
+
+These results were collected after the Task 09 cluster rebuild.
+They confirm the final operational state, not the original Task 05
+deployment timestamps.
+
+### Screenshot evidence
+
+Task 05 screenshots are stored under `evidences/task-05/`.
+They document the development resource tree, CRUD operations,
+staging synchronization, and frontend verification.
+
+---
+
+## Task 6 — Argo CD Reviewer RBAC
+
+### Objective
+
+Configure restricted reviewer access in Argo CD and verify
+that the reviewer cannot perform unauthorized operations.
+
+### Implementation
+
+The reviewer RBAC policy was introduced in commit `686f1cb`.
+A policy indentation correction was committed as `5161bf1`.
+
+Configuration file:
+`bootstrap/argocd/argocd-rbac-cm-patch.yaml`
+
+The final policy grants:
+- Read access to Applications in the `dso202` project.
+- Read access to the `dso202` AppProject.
+- Read access to application logs in the project.
+
+It does not grant application synchronization permission.
+
+### Verification command
+
+```bash
+kubectl get configmap argocd-rbac-cm -n argocd \
+  -o jsonpath='{.data.policy\.csv}'
+```
+
+### Observed result — 2026-11-23
+
+```text
+p, reviewer, applications, get, dso202/*, allow
+p, reviewer, projects, get, dso202, allow
+p, reviewer, logs, get, dso202/*, allow
+```
+
+This confirms the final RBAC policy after the Task 09 rebuild.
+It does not by itself prove the historical access-denial tests.
+
+### Screenshot evidence
+
+Task 06 screenshots are stored under `evidences/task-06/`.
+
+They document reviewer read-only access, denied synchronization,
+the initial log-access restriction, and successful log access
+after the policy correction.
+
+---
+
+## Task 7 — Release Promotion, Rollback and Fix-Forward
+
+### Objective
+
+Demonstrate controlled release promotion, recovery from a
+failed development deployment, and staging protection using
+Git tags and manual synchronization.
+
+### Release history
+
+Three release tags were verified:
+
+- `v1.0.0` — baseline release, commit `3b15e6e`
+- `v1.1.0` — frontend 1.1 release, commit `b75b8b5`
+- `v1.2.0` — corrected backend 1.1, commit `12e6c2e`
+
+The release workflow included:
+
+1. Promoting frontend 1.1 to development.
+2. Promoting the approved `v1.1.0` tag to staging.
+3. Introducing a faulty backend 1.1 deployment.
+4. Observing the backend startup failure.
+5. Attempting an Argo CD rollback.
+6. Recovering development through a Git revert.
+7. Fixing the backend configuration and promoting `v1.2.0`.
+
+### Failure and recovery
+
+The faulty backend 1.1 release required the `RELEASE_MODE`
+environment variable, which was missing from its configuration.
+
+The deployment failed during startup.
+
+Argo CD refused the rollback operation while automated
+synchronization was enabled.
+
+Recovery was completed using a Git revert, followed by a
+corrected fix-forward release.
+
+Staging remained pinned to its approved release until
+manual promotion. The faulty development commit was not
+promoted to staging.
+
+The detailed explanation is recorded under Q5 in `README.md`.
+
+### Git and pull request evidence
+
+The release process was recorded through Git commits,
+release tags, and GitHub pull requests.
+
+Relevant pull requests:
+
+- PR #3 — Promote staging to v1.1.0
+- PR #4 — Introduce faulty backend 1.1
+- PR #5 — Revert the faulty deployment
+- PR #6 — Fix-forward backend 1.1
+- PR #7 — Promote staging to v1.2.0
+- PR #8 — Add Task 07 documentation and screenshots
+
+### Verification commands
+
+The following commands were used to verify the final
+release tags and Argo CD Application states:
+
+```bash
+git tag -l 'v1.*'
+kubectl get applications -n argocd
+```
+
+### Observed results — 2026-11-23
+
+Release tags:
+
+```text
+v1.0.0
+v1.1.0
+v1.2.0
+```
+
+All six Argo CD Applications reported `Synced` and `Healthy`.
+
+The development and staging backend, frontend, and database
+workloads were ready after the Task 09 rebuild.
+
+Both PostSync smoke-test Jobs completed successfully.
+
+These results confirm the final recovered state. Historical
+deployment failures and recovery actions are documented by
+the screenshots and Git history.
+
+### Screenshot evidence
+
+Task 07 contains 14 screenshots under `evidences/task-07/`.
+
+They document:
+
+- Frontend 1.1 deployment in development.
+- Staging promotion to v1.1.0.
+- Faulty backend deployment and startup failure.
+- Argo CD rollback refusal.
+- Successful recovery through Git revert.
+- Backend fix-forward deployment.
+- Staging promotion to v1.2.0.
+- Deployment history and GitHub pull requests.
+
+### Result
+
+The release workflow demonstrated controlled staging
+promotion, Git-based recovery, and successful fix-forward
+deployment.
+
+---
+
+
 ## Task 8 — Drift, Pruning and AppProject Guardrails
 
 ### Objective
