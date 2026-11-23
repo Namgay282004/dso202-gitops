@@ -2441,3 +2441,111 @@ Technical implementation completed successfully.
 The cluster is ready for Task 5, where the Task Tracker workload
 Applications will be deployed using the existing platform resources
 and controller-generated credentials.
+
+---
+
+## Task 8 — Drift, Pruning and AppProject Guardrails
+
+### Objective
+
+Verify Argo CD drift detection, development self-healing, staging manual
+reconciliation, GitOps resource pruning, and AppProject resource restrictions.
+
+### Drill 1 — Development Self-Healing
+
+**Prediction:** Manually scaling the development backend from one to three
+replicas would cause drift, and Argo CD would automatically restore the
+Git-declared replica count.
+
+**Action:** Scaled `tasktracker-backend-deployment` in `dso202-dev` to
+three replicas.
+
+**Observation:** Argo CD detected and corrected the drift automatically
+because development has automated synchronization with self-healing enabled.
+
+**Restoration:** Argo CD restored the backend to one replica without a
+manual synchronization.
+
+**Evidence:** `evidences/task-08/36-dev-drift-self-healing.png`
+
+### Drill 2 — Staging Drift and Manual Reconciliation
+
+**Prediction:** Scaling the staging backend to three replicas would
+produce an OutOfSync state without automatic restoration.
+
+**Action:** Manually scaled `tasktracker-backend-deployment` in
+`dso202-staging` to three replicas.
+
+**Observation:** Argo CD reported OutOfSync while the workload remained
+Healthy. The application diff showed three live replicas versus one
+desired replica.
+
+**Restoration:** Manually synchronized `tasktracker-staging`, restoring
+one replica and returning the application to Synced and Healthy.
+
+**Evidence:**
+- `evidences/task-08/37-staging-drift-before-manual-sync.png`
+- `evidences/task-08/38-staging-restored-manual-sync.png`
+
+### Drill 3 — GitOps Pruning
+
+**Prediction:** A temporary ConfigMap committed to the development
+platform manifests would be created by Argo CD. Removing the manifest
+from Git would cause automatic pruning.
+
+**Action:** Added `platform/dev/prune-drill.yaml` through PR #9.
+
+**Observation:** After merging, Argo CD created the ConfigMap.
+
+**Restoration:** Removed the manifest through PR #10. Argo CD
+automatically pruned the ConfigMap and returned `platform-dev` to
+Synced and Healthy.
+
+The namespace was protected using `Prune=false`; this did not prevent
+pruning of the temporary ConfigMap.
+
+**Evidence:**
+- `evidences/task-08/39-prune-configmap-created.png`
+- `evidences/task-08/40-prune-configmap-removed.png`
+
+### Drill 4 — AppProject Resource Guardrails
+
+**Prediction:** Adding a ResourceQuota to the workload Helm chart
+would be rejected because ResourceQuota is not permitted by the
+`dso202` AppProject namespace resource whitelist.
+
+**Action:** Added `charts/tasktracker/templates/drill-quota.yaml`
+through PR #11. Helm validation passed before merging.
+
+**Observation:** Argo CD reported:
+`resource :ResourceQuota is not permitted in project dso202`.
+
+Development became OutOfSync, and the forbidden ResourceQuota was
+not created. Staging remained pinned to `v1.2.0`, Synced and Healthy.
+
+**Restoration:** Reverted the introducing commit through PR #12.
+Development returned to Synced and Healthy at revision `0cab3b5`.
+The ResourceQuota was absent from Git, Kubernetes, and the current
+desired manifests. No AppProject permissions were weakened.
+
+**Evidence:**
+- `evidences/task-08/41-appproject-resourcequota-rejected.png`
+- `evidences/task-08/42-development-restored-after-guardrail-revert.png`
+
+### Final Verification
+
+| Check | Result |
+|---|---|
+| Development self-healing | PASS |
+| Staging manual reconciliation | PASS |
+| ConfigMap creation and automatic pruning | PASS |
+| AppProject rejection of forbidden ResourceQuota | PASS |
+| Development restored to Synced / Healthy | PASS |
+| Staging remained Synced / Healthy | PASS |
+| Forbidden ResourceQuota absent after revert | PASS |
+| Seven screenshots (36–42) captured | PASS |
+
+**Conclusion:** All four drills passed. Development automatically
+reconciled drift, staging required manual synchronization, GitOps
+pruned the temporary ConfigMap, and AppProject restrictions prevented
+deployment of an unauthorized resource.
