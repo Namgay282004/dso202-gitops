@@ -1,36 +1,70 @@
-# DSO202 Assignment 4 — GitOps with Argo CD
+# DSO202 Assignment 4: GitOps with Argo CD
+
+A GitOps deployment of the **Task Tracker** application on a local Kubernetes cluster. The project uses Helm to package application resources, Argo CD to reconcile Git configuration with the cluster, and Sealed Secrets to manage encrypted credentials.
+
+The repository demonstrates deployment to development and staging, access restrictions, release promotion, recovery from a failed release, configuration drift detection, and disaster recovery.
+
+## Contents
+
+1. [Project Overview](#project-overview)
+2. [Architecture](#architecture)
+3. [Repository Structure](#repository-structure)
+4. [Tools and Versions](#tools-and-versions)
+5. [Getting Started](#getting-started)
+6. [Verification and Evidence](#verification-and-evidence)
+7. [Rebuild from an Empty Kind Cluster](#rebuild-from-an-empty-kind-cluster)
+8. [Cleanup](#cleanup)
+9. [Credential Handling](#credential-handling)
+10. [Written Questions](#written-questions)
 
 ## Project Overview
 
-This repository implements GitOps-based deployment of the
-Task Tracker application using Kubernetes, Helm, Argo CD,
-and Sealed Secrets.
+The application has three components: a frontend, a backend API, and a PostgreSQL database. The same Helm chart is configured for two Kubernetes namespaces.
 
-The application is deployed to two environments:
+| Property | Development | Staging |
+|---|---|---|
+| Namespace | `dso202-dev` | `dso202-staging` |
+| Git revision | `main` | Release tag `v1.2.0` |
+| Synchronization | Automatic | Manual |
+| Automatic pruning | Enabled | Not enabled |
+| Automatic self healing | Enabled | Not enabled |
+| Frontend access | `http://localhost:30080` | Port forwarding required |
 
-- Development (`dso202-dev`): follows the `main` branch
-  with automated synchronization, pruning, and self-healing.
-- Staging (`dso202-staging`): follows a pinned Git release
-  tag and requires manual synchronization.
+Development receives approved changes from `main` through automatic synchronization. Staging uses a fixed release tag and requires a deliberate manual synchronization before promotion.
 
-The repository also includes Kubernetes platform policies,
-Argo CD AppProjects, application definitions, encrypted
-SealedSecrets, and disaster recovery documentation.
+## Architecture
 
-## Repository
+GitHub stores the desired configuration. Argo CD monitors the repository and applies the relevant resources to the Kind cluster. The root Application manages the remaining Argo CD configuration, including the workload project and child Applications.
 
-- GitHub: https://github.com/Namgay282004/dso202-gitops
-- Main branch: `main`
-- Release tags: `v1.0.0`, `v1.1.0`, `v1.2.0`
-- Cluster name: `dso202-gitops`
+The `platform` AppProject manages administrative and platform resources. The restricted `dso202` AppProject manages the Task Tracker workloads only in the development and staging namespaces. The Helm chart deploys the database, backend, and frontend in synchronization order. A PostSync Job verifies the application after deployment.
 
-## Verified Tool Versions
+Encrypted SealedSecret manifests are stored in Git. The matching private sealing key is backed up separately and is required for recovery after cluster loss.
+
+## Repository Structure
+
+```text
+dso202-gitops/
+├── .gitignore                 # Prevents sensitive local files from being tracked
+├── README.md                  # Project guide and written answers
+├── argocd/                   # AppProjects and declarative Applications
+├── bootstrap/                # Argo CD installation and root bootstrap
+├── charts/tasktracker/       # Helm chart for the three application tiers
+├── cluster/                  # Kind cluster configuration
+├── docs/evidence.md          # Practical outputs, observations and screenshots
+├── environments/            # Development and staging Helm values
+├── evidences/                # Screenshots organized by task
+└── platform/                 # Namespace policies and encrypted credentials
+```
+
+## Tools and Versions
+
+The following versions were recorded for this assignment. Use the pinned versions and image references in the committed configuration when rebuilding the environment.
 
 | Component | Version |
 |---|---|
 | Docker Engine | 28.3.3 |
 | Kind | 0.32.0 |
-| Kubernetes node | 1.36.1 (digest pinned in cluster configuration) |
+| Kubernetes node | 1.36.1 |
 | kubectl | 1.36.3 |
 | Helm CLI | 4.3.0 |
 | Argo CD | 3.5.6 |
@@ -38,23 +72,56 @@ SealedSecrets, and disaster recovery documentation.
 | kubeseal | 0.40.0 |
 | Git | 2.34.1 |
 
-The Kind node image is pinned to an immutable SHA-256 digest
-in `cluster/kind-cluster.yaml`.
+The Kind node image is pinned to an immutable digest in `cluster/kind-cluster.yaml`. The Argo CD installation references release `v3.5.6`, and the Sealed Secrets controller uses Helm chart `2.20.0`.
 
-Argo CD is installed from its pinned v3.5.6 release
-manifest. Sealed Secrets uses Helm chart version 2.20.0.
+## Getting Started
 
-## Documentation
+Install Docker, Git, Kind, kubectl, Helm, the Argo CD CLI, and kubeseal before beginning. Docker must be running. The full recovery sequence appears in [Rebuild from an Empty Kind Cluster](#rebuild-from-an-empty-kind-cluster).
 
-- `docs/evidence.md`: command outputs, observations,
-  and verification evidence for Tasks 01–09.
-- `evidences/`: supporting screenshots organized by task.
-- `charts/tasktracker/`: Helm chart for the application.
-- `environments/`: development and staging Helm values.
-- `platform/`: namespace policies and encrypted credentials.
-- `argocd/`: declarative Applications and AppProjects.
-- `bootstrap/`: initial Argo CD and root Application setup.
-- `cluster/`: reproducible Kind cluster configuration.
+**Important:** The recovery procedure needs the original Sealed Secrets private key backup, which is intentionally not included in this public repository. Without that backup, the existing encrypted credentials cannot be restored in a new cluster.
+
+For an existing deployment, inspect the Argo CD Applications and Kubernetes resources using:
+
+```bash
+kubectl get applications -n argocd
+kubectl get deployments,statefulsets,jobs -n dso202-dev
+kubectl get deployments,statefulsets,jobs -n dso202-staging
+```
+
+Do not recreate the cluster simply to inspect the submission.
+
+## Verification and Evidence
+
+The detailed practical report is available in [docs/evidence.md](docs/evidence.md). It contains the implementation commands, actual observations, and screenshots for Tasks 1 through 9.
+
+| Task | Verification focus |
+|---|---|
+| 1 | Repository setup, Helm chart contract and cluster checks |
+| 2 | Declarative Argo CD installation |
+| 3 | AppProject boundaries and root Application |
+| 4 | Platform policies and Sealed Secrets |
+| 5 | Workload deployment, synchronization and smoke testing |
+| 6 | Reviewer permissions and log access |
+| 7 | Release promotion, failure diagnosis and recovery |
+| 8 | Drift, pruning and resource restrictions |
+| 9 | Cluster rebuild and application recovery |
+
+Supporting screenshots are stored in [`evidences/`](evidences/). The recorded release tags are `v1.0.0`, `v1.1.0`, and `v1.2.0`.
+
+## Repository and Submission
+
+**Public repository:** https://github.com/Namgay282004/dso202-gitops
+
+**Main branch:** `main`  
+**Release tags:** `v1.0.0`, `v1.1.0`, `v1.2.0`
+
+The assignment also requires the **current full commit SHA of `main` at submission time**. Obtain it after merging the final documentation changes:
+
+```bash
+git rev-parse main
+```
+
+Do not use an earlier SHA after new commits have been merged.
 
 ---
 
@@ -112,7 +179,7 @@ Open `http://localhost:8081` for staging. Verify CRUD operations and both enviro
 
 ## Cleanup
 
-**Destructive — only run when intentionally removing the local lab:**
+**Destructive : only run when intentionally removing the local lab:**
 
 ```bash
 kind delete cluster --name dso202-gitops
@@ -128,7 +195,7 @@ The chart refers to existing Kubernetes Secrets; it does not render plaintext Se
 
 ## Written Questions
 
-### Q1 — AppProject Boundaries and Bootstrap
+### Q1 : AppProject Boundaries and Bootstrap
 
 **Why is the platform project applied by hand while dso202 is created
 by the root Application, and which risk arises if dso202 is allowed
@@ -162,7 +229,7 @@ whitelist of workload resource kinds. Administrative deployment
 permissions remain with the platform project.
 
 
-### Q2 — Sealed Secrets scope and key recovery
+### Q2 : Sealed Secrets scope and key recovery
 
 **Question:** What does strict scope prevent, and what is lost,
 and what must be done, if the sealing key is lost?
@@ -212,17 +279,17 @@ uses permission 600. The actual key material is never committed
 to Git. For reliable disaster recovery, a protected backup should
 also be maintained separately from the original machine.
 
-The key restoration and cluster recovery process will be
+The key restoration and cluster recovery process is
 demonstrated in Task 9.
 
 
-### Q3 — Synced versus Healthy
+### Q3 : Synced versus Healthy
 
 **Synced** means the live Kubernetes resources match the desired manifests at the Application's selected Git revision. **Healthy** means Argo CD's health assessments report that those resources are functioning as expected. These are independent: an Application can be Synced while its Deployment is unavailable or its Job is failing.
 
 In Task 5, staging initially required a manual sync: the root Application could have its child Application definitions synchronized from Git while the unsynchronized staging workload was still Missing/Progressing. Another reproducible example is a Deployment whose desired image and manifest have been applied (Synced) but whose Pod fails readiness checks (not Healthy). The recorded Task 5 observations and Application status outputs are in `docs/evidence.md`.
 
-### Q4 — Argo CD RBAC, Kubernetes RBAC, and SSO
+### Q4 : Argo CD RBAC, Kubernetes RBAC, and SSO
 
 **Argo CD RBAC** authorizes operations through Argo CD, such as viewing Applications, reading logs, synchronizing workloads and accessing projects. It is configured in the Argo CD `argocd-rbac-cm` ConfigMap via `policy.csv` and related settings, represented in `bootstrap/argocd/argocd-rbac-cm-patch.yaml`. In Task 6, `reviewer` could read only the `dso202` project Applications, could not sync, and received log access only after an explicit policy rule was committed and the bootstrap layer reapplied.
 
@@ -230,7 +297,7 @@ In Task 5, staging initially required a manual sync: the root Application could 
 
 With an organizational identity provider connected through SSO, `policy.csv` would normally map authenticated identity-provider groups to Argo CD roles using `g, <identity-provider-group>, <role>` rules. The `p, ...` permission rules could remain role-based, while the local `reviewer` account would no longer be needed for that identity. SSO was **not** configured in this assignment.
 
-### Q5 — Rollback, Fix-Forward and Staging Protection
+### Q5 : Rollback, Fix-Forward and Staging Protection
 
 **Question: Why was the Argo CD rollback refused, how was the failed release recovered, and how was staging protected?**
 
@@ -284,7 +351,8 @@ prevents unverified changes from reaching staging.
 
 
 `git revert` creates an auditable inverse commit while preserving the original faulty change and its investigation history; deleting or rewriting the bad commit would break the shared history that GitOps and reviewers rely on.
-### Q6 — Repository Trade-offs and Recovery Boundaries
+
+### Q6 : Repository Trade-offs and Recovery Boundaries
 
 **(a) One repository for chart and environment configuration.** Two advantages are (1) a single pull request can review application deployment definitions and environment values together, and (2) releases and disaster recovery are easier to trace because related configuration lives in one versioned history. Two disadvantages are (1) changes to application and environment configuration have a shared review/access boundary, making least-privilege ownership harder, and (2) the repository can become noisy and tightly coupled as teams and environments grow. Separate application-source and deployment-configuration repositories can support independent access and release lifecycles.
 

@@ -1,10 +1,4 @@
-<!--
-File        : docs/evidence.md
-Assignment  : DSO202 Assignment 4
-Purpose     : Records command outputs and verification evidence for each task.
--->
-
-# DSO202 Assignment 4 — Evidence
+# DSO202 Assignment 4 : Evidence
 
 ## Task 1
 
@@ -14,7 +8,7 @@ The Assignment 4 repository reuses the Helm chart from
 Assignment 3, resource restrictions from Assignment 2,
 and the Kind cluster configuration from Practical 1.
 
-The namespace-scoped Role and RoleBinding manifests were
+The namespace scoped Role and RoleBinding manifests were
 recreated because the original Assignment 2 RBAC manifests
 were unavailable in the local assignment files.
 
@@ -43,6 +37,11 @@ in the later deployment tasks.
 
 
 ### Tool Verification (Section 3.2)
+
+**Figure 1.1: Tool versions and Helm repository verification.**
+
+![Tool versions and Helm repository verification](../evidences/task-01/01-tool-and-helm-verification.png)
+
 
 ```text
 $ docker version --format "{{.Server.Version}}"
@@ -92,6 +91,19 @@ sealed-secrets/sealed-secrets	2.19.3       	0.39.1     	Helm chart for the seale
 
 ### Repository History
 
+**Figure 1.2: Repository and cluster status.**
+
+![Repository and cluster status](../evidences/task-01/02-repository-and-cluster-status.png)
+
+**Figure 1.4: Initial Git history and repository protection.**
+
+![Initial Git history and repository protection](../evidences/task-01/04-corrected-git-history.png)
+
+**Figure 1.7: Task 1 Git commit.**
+
+![Task 1 Git commit](../evidences/task-01/07-task-01-git-commit.png)
+
+
 ```text
 $ git log --oneline --reverse
 be2c43d chore: add gitignore to protect secrets and key material
@@ -103,6 +115,11 @@ origin	https://github.com/Namgay282004/dso202-gitops.git (push)
 ```
 
 ### Kind Cluster Verification
+
+**Figure 1.3: Cluster node inventory.**
+
+![Cluster node inventory](../evidences/task-01/03-cluster-inventory.png)
+
 
 ```text
 $ kind get clusters
@@ -125,6 +142,15 @@ dso202-gitops-worker
 ```
 
 ### Helm Lint and Template Verification
+
+**Figure 1.5: Helm lint for development and staging.**
+
+![Helm lint for development and staging](../evidences/task-01/05-helm-lint-dev-and-staging.png)
+
+**Figure 1.6: Rendered Helm resource kinds.**
+
+![Rendered Helm resource kinds](../evidences/task-01/06-helm-template-resource-kinds.png)
+
 
 #### Environment: dev
 
@@ -437,7 +463,7 @@ $ Check forbidden resource kinds
 PASS: No forbidden resources rendered
 ```
 
-### C2 — Configurable Backend Environment Test
+### C2 : Configurable Backend Environment Test
 
 ```text
 $ helm template with backend.env.GITOPS_CONTRACT_TEST=verified
@@ -496,13 +522,12 @@ They are not a guarantee that every possible secret format has
 been detected.
 
 
----
 
-## Task 2 — Install Argo CD Declaratively
+## Task 2 : Install Argo CD Declaratively
 
 ### 1. Objective
 
-Install Argo CD using a version-controlled Kustomize configuration
+Install Argo CD using a version controlled Kustomize configuration
 with a pinned upstream release and local configuration patches.
 
 Mapped descriptors: 4.1.2, 4.2.1, Unit III 3.1.4.
@@ -638,7 +663,7 @@ kubectl apply -k bootstrap/argocd \
 
 Server-side apply was used because the ApplicationSet CRD exceeds
 the 262144-byte annotation size limit associated with ordinary
-client-side apply.
+client side apply.
 
 The installation was verified through Deployment availability,
 StatefulSet readiness, running Pods and registered CRDs.
@@ -720,7 +745,7 @@ Result: PASS. All three required CRDs exist.
 
 ### 6. Argo CD access and authentication
 
-The following port-forward command was used:
+The following port forwarding command was used:
 
 ```bash
 kubectl port-forward --address 127.0.0.1 \
@@ -966,7 +991,7 @@ architecture.
 ### 11. Conclusion
 
 Argo CD v3.5.6 was installed declaratively using Kustomize
-and server-side apply on the existing dso202-gitops Kind
+and server side apply on the existing dso202-gitops Kind
 cluster.
 
 All seven components are healthy, the required CRDs exist,
@@ -981,9 +1006,8 @@ The Argo CD installation is ready for Task 3, which introduces
 AppProjects and the root Application.
 
 
----
 
-## Task 3 — AppProjects and the Root Application
+## Task 3 : AppProjects and the Root Application
 
 ### 3.1 Objective
 
@@ -1048,7 +1072,7 @@ The ServiceAccount entry from the reference listing was omitted because
 the current Helm chart does not render a ServiceAccount.
 
 The Job entry is retained because it is explicitly required for the
-smoke-test hook in Task 5.
+smoke test hook in Task 5.
 
 No additional resource kinds were introduced.
 
@@ -1086,7 +1110,7 @@ Final live cluster resource whitelist:
 ```
 
 The empty cluster resource whitelist prevents the workload project from
-deploying cluster-scoped resources.
+deploying cluster scoped resources.
 
 Verified AppProject sync wave:
 
@@ -1162,7 +1186,7 @@ application.argoproj.io/root created (server dry run)
 appproject.argoproj.io/dso202 created (server dry run)
 ```
 
-All three manifests passed server-side validation.
+All three manifests passed server side validation.
 
 The finalizer warning is a Kubernetes naming recommendation.
 The Argo CD finalizer was retained because it is required for cascading
@@ -1170,7 +1194,7 @@ deletion and is specified in the assignment reference configuration.
 
 Whitespace validation returned no warnings.
 
-No resources were created during the dry-run operations.
+No resources were created during the dry run operations.
 
 ### 3.7 Security Verification Before Git Push
 
@@ -1223,7 +1247,7 @@ Before creating the Task 3 resources, the Kubernetes cluster and
 Argo CD components were checked.
 
 Following a restart of the cluster containers, the Redis Pod briefly
-reported an Unknown state and the previous port-forward connection
+reported an Unknown state and the previous port forwarding connection
 was unavailable.
 
 Redis recovered automatically. The temporary initialization failure
@@ -1247,7 +1271,7 @@ deployment.apps/argocd-server condition met
 
 All seven Argo CD Pods were Running and Ready.
 
-The port-forward connection was restored using:
+The port forwarding connection was restored using:
 
 ```bash
 kubectl port-forward --address 127.0.0.1 \
@@ -1477,7 +1501,7 @@ Observed output:
 }
 ```
 
-Automatic pruning, self-healing and exponential retry backoff
+Automatic pruning, automatic recovery and exponential retry backoff
 are correctly configured.
 
 The synchronized Git revision and the local Git revision were both:
@@ -1491,7 +1515,7 @@ intended Git commit.
 
 ### 3.17 Required Screenshot
 
-**Screenshot 09 — Root Application Resource Tree**
+**Screenshot 09 : Root Application Resource Tree**
 
 ![Root Application resource tree](../evidences/task-03/09-root-application-resource-tree.png)
 
@@ -1547,9 +1571,8 @@ From this point onward, new Applications and AppProjects are introduced
 through Git rather than being created manually.
 
 
----
 
-## Task 4 — Sealed Secrets and Platform Applications
+## Task 4 : Sealed Secrets and Platform Applications
 
 ### 4.1 Objective
 
@@ -1608,7 +1631,7 @@ The configuration follows Listing 9 of the assignment guide.
 | CreateNamespace | true |
 | Retry limit | 5 |
 
-Server-side dry-run validation passed.
+Server-side dry run validation passed.
 
 The Helm rendering contained the following resource kinds:
 
@@ -1628,7 +1651,7 @@ The controller image was verified as:
 The pinned chart and controller versions satisfy the assignment
 version requirements.
 
-### 4.4 Official Step 1 — Controller installation evidence
+### 4.4 Official Step 1:— Controller installation evidence
 
 The controller Application was committed and pushed to Git.
 
@@ -1683,7 +1706,7 @@ Additional verification:
 
 The root Application managed the controller installation through Git.
 
-### 4.5 Official Step 2 — Private sealing key backup
+### 4.5 Official Step 2 : Private sealing key backup
 
 The controller generated a Kubernetes TLS Secret containing its
 sealing key and certificate.
@@ -1733,7 +1756,7 @@ from this evidence document.
 
 Actual key restoration and recovery will be demonstrated in Task 9.
 
-### 4.6 Official Step 3 — Plaintext credential preparation
+### 4.6 Official Step 3 : Plaintext credential preparation
 
 Two temporary credential input files were created:
 
@@ -1797,7 +1820,7 @@ Development encryption command:
     kubectl create secret generic tasktracker-credentials \
       --namespace dso202-dev \
       --from-env-file=secrets-plain/dev.env \
-      --dry-run=client -o yaml \
+      --dry run=client -o yaml \
       | kubeseal --format yaml \
       > platform/dev/tasktracker-credentials.sealed.yaml
 
@@ -1806,7 +1829,7 @@ Staging encryption command:
     kubectl create secret generic tasktracker-credentials \
       --namespace dso202-staging \
       --from-env-file=secrets-plain/staging.env \
-      --dry-run=client -o yaml \
+      --dry run=client -o yaml \
       | kubeseal --format yaml \
       > platform/staging/tasktracker-credentials.sealed.yaml
 
@@ -1891,7 +1914,7 @@ The encrypted manifests remained available for GitOps deployment.
 No plaintext Kubernetes Secret manifest was written to disk
 by the encryption pipelines.
 
-### 4.10 Official Step 5 — Platform manifest preparation
+### 4.10 Official Step 5 : Platform manifest preparation
 
 The following platform directory structure was verified:
 
@@ -1952,12 +1975,12 @@ Each platform directory declares six resources:
 The regular Kubernetes Secret is not declared in Git.
 It is generated by the Sealed Secrets controller.
 
-### 4.11 Platform manifest dry-run validation
+### 4.11 Platform manifest dry run validation
 
 Namespace validation commands:
 
-    kubectl apply --dry-run=server -f platform/dev/namespace.yaml
-    kubectl apply --dry-run=server -f platform/staging/namespace.yaml
+    kubectl apply --dry run=server -f platform/dev/namespace.yaml
+    kubectl apply --dry run=server -f platform/staging/namespace.yaml
 
 Output:
 
@@ -1966,7 +1989,7 @@ Output:
 
 Application validation:
 
-    kubectl apply --dry-run=server \
+    kubectl apply --dry run=server \
       -f argocd/applications/platform-dev.yaml \
       -f argocd/applications/platform-staging.yaml
 
@@ -1975,13 +1998,13 @@ Output:
     application.argoproj.io/platform-dev created (server dry run)
     application.argoproj.io/platform-staging created (server dry run)
 
-Individual and combined Application dry-run validations passed.
+Individual and combined Application dry run validations passed.
 
 Kubernetes reported a finalizer naming warning. The standard Argo CD
 resource finalizer was retained because this was a warning rather
 than a validation failure.
 
-No live platform resources were created by the dry-run commands.
+No live platform resources were created by the dry run commands.
 
 ### 4.12 Platform Git commit and deployment
 
@@ -2030,7 +2053,7 @@ Observed reconciliation sequence:
 
 No manual platform Application or namespace creation was performed.
 
-### 4.13 Official Step 6 — Application and namespace evidence
+### 4.13 Official Step 6 : Application and namespace evidence
 
 Command:
 
@@ -2263,7 +2286,7 @@ Recorded output:
 This confirms that both Kubernetes Secrets are owned by their
 corresponding SealedSecret resources.
 
-### 4.19 Official Step 7 — Credential history security searches
+### 4.19 Official Step 7 : Credential history security searches
 
 The four credential keys in each namespace were retrieved into
 a Python process for validation. Their base64-encoded values
@@ -2442,16 +2465,32 @@ The cluster is ready for Task 5, where the Task Tracker workload
 Applications will be deployed using the existing platform resources
 and controller-generated credentials.
 
----
 
-## Task 5 — Workload Deployment and PostSync Verification
+## Task 5 : Workload Deployment and PostSync Verification
 
 ### Objective
 
 Deploy the Task Tracker application in development and staging using
-Argo CD, Helm, health checks, and a PostSync smoke-test Job.
+Argo CD, Helm, health checks, and a PostSync smoke test Job.
 
 ### Implementation
+
+**Figure 5.3: Development task creation and reading.**
+
+![Development task creation and reading](../evidences/task-05/11-tasktracker-dev-crud-success.png)
+
+**Figure 5.4: Development task update.**
+
+![Development task update](../evidences/task-05/12-tasktracker-dev-update-success.png)
+
+**Figure 5.5: Development task deletion.**
+
+![Development task deletion](../evidences/task-05/13-tasktracker-dev-delete-success.png)
+
+**Figure 5.8: Staging frontend verification.**
+
+![Staging frontend verification](../evidences/task-05/16-tasktracker-staging-frontend.png)
+
 
 The workload Applications were introduced in commit `7c496e5`.
 
@@ -2459,7 +2498,7 @@ Development:
 - Application: `tasktracker-dev`
 - Namespace: `dso202-dev`
 - Git revision: `main`
-- Automated synchronization, pruning, and self-healing enabled
+- Automated synchronization, pruning, and automatic recovery enabled
 
 Staging:
 - Application: `tasktracker-staging`
@@ -2467,7 +2506,7 @@ Staging:
 - Git revision: `v1.2.0` (final approved release)
 - Manual synchronization required
 
-The smoke-test Job was introduced in commit `3b15e6e`
+The smoke test Job was introduced in commit `3b15e6e`
 and uses the Argo CD `PostSync` hook.
 
 It sends an HTTP request to the backend `/api/tasks` endpoint.
@@ -2484,27 +2523,36 @@ kubectl get deployments,statefulsets,jobs -n dso202-staging
 
 ### Observed results — Final verification, 2026-11-23
 
-| Resource | Development | Staging |
-|---|---|---|
-| Argo CD Application | Synced / Healthy | Synced / Healthy |
-| Backend | 1/1 Ready | 1/1 Ready |
-| Frontend | 1/1 Ready | 1/1 Ready |
-| Database | 1/1 Ready | 1/1 Ready |
-| PostSync Job | Complete (23s) | Complete (21s) |
+**Figure 5.1: Development application resource tree, first view.**
+
+![Development application resource tree, first view](../evidences/task-05/10-tasktracker-dev-resource-tree-a.png)
+
+**Figure 5.2: Development application resource tree, second view.**
+
+![Development application resource tree, second view](../evidences/task-05/10-tasktracker-dev-resource-tree-b.png)
+
+**Figure 5.6: Staging before manual synchronization.**
+
+![Staging before manual synchronization](../evidences/task-05/14-tasktracker-staging-outofsync.png)
+
+**Figure 5.7: Staging after manual synchronization.**
+
+![Staging after manual synchronization](../evidences/task-05/15-tasktracker-staging-synced-healthy.png)
+
+**Figure 5.9: Root Application after staging synchronization.**
+
+![Root Application after staging synchronization](../evidences/task-05/17-root-application-after-staging-sync.png)
+
+
+The final verification after the Task 9 rebuild confirmed that both Argo CD Applications were Synced and Healthy. The backend, frontend and database each reported one ready replica in both environments. The development PostSync Job completed in 23 seconds and the staging Job completed in 21 seconds. The resource trees and synchronization screenshots below provide visual confirmation of the deployment states.
 
 These results were collected after the Task 09 cluster rebuild.
 They confirm the final operational state, not the original Task 05
 deployment timestamps.
 
-### Screenshot evidence
 
-Task 05 screenshots are stored under `evidences/task-05/`.
-They document the development resource tree, CRUD operations,
-staging synchronization, and frontend verification.
 
----
-
-## Task 6 — Argo CD Reviewer RBAC
+## Task 6 : Argo CD Reviewer RBAC
 
 ### Objective
 
@@ -2535,6 +2583,23 @@ kubectl get configmap argocd-rbac-cm -n argocd \
 
 ### Observed result — 2026-11-23
 
+**Figure 6.1: Reviewer permitted to view applications.**
+
+![Reviewer permitted to view applications](../evidences/task-06/18-reviewer-read-only-access.png)
+
+**Figure 6.2: Reviewer denied synchronization permission.**
+
+![Reviewer denied synchronization permission](../evidences/task-06/19-reviewer-sync-denied.png)
+
+**Figure 6.3: Reviewer denied access to logs before policy update.**
+
+![Reviewer denied access to logs before policy update](../evidences/task-06/20-reviewer-logs-denied..png)
+
+**Figure 6.4: Reviewer permitted to read logs after policy update.**
+
+![Reviewer permitted to read logs after policy update](../evidences/task-06/21-reviewer-logs-allowed.png)
+
+
 ```text
 p, reviewer, applications, get, dso202/*, allow
 p, reviewer, projects, get, dso202, allow
@@ -2544,15 +2609,7 @@ p, reviewer, logs, get, dso202/*, allow
 This confirms the final RBAC policy after the Task 09 rebuild.
 It does not by itself prove the historical access-denial tests.
 
-### Screenshot evidence
 
-Task 06 screenshots are stored under `evidences/task-06/`.
-
-They document reviewer read-only access, denied synchronization,
-the initial log-access restriction, and successful log access
-after the policy correction.
-
----
 
 ## Task 7 — Release Promotion, Rollback and Fix-Forward
 
@@ -2563,6 +2620,35 @@ failed development deployment, and staging protection using
 Git tags and manual synchronization.
 
 ### Release history
+
+**Figure 7.1: Development frontend version 1.1 healthy.**
+
+![Development frontend version 1.1 healthy](../evidences/task-07/22-dev-frontend-1.1-synced-healthy.png)
+
+**Figure 7.2: Development frontend version 1.1 in browser.**
+
+![Development frontend version 1.1 in browser](../evidences/task-07/23-dev-frontend-1.1-browser.png)
+
+**Figure 7.3: Staging awaiting manual promotion to version 1.1.0.**
+
+![Staging awaiting manual promotion to version 1.1.0](../evidences/task-07/24-staging-v1.1.0-before-manual-sync.png)
+
+**Figure 7.4: Staging healthy after version 1.1.0 promotion.**
+
+![Staging healthy after version 1.1.0 promotion](../evidences/task-07/25-staging-v1.1.0-synced-healthy.png)
+
+**Figure 7.5: Staging frontend version 1.1 in browser.**
+
+![Staging frontend version 1.1 in browser](../evidences/task-07/26-staging-frontend-1.1-browser.png)
+
+**Figure 7.11: Staging awaiting manual promotion to version 1.2.0.**
+
+![Staging awaiting manual promotion to version 1.2.0](../evidences/task-07/32-staging-v1.2.0-before-manual-sync.png)
+
+**Figure 7.12: Staging healthy after version 1.2.0 promotion.**
+
+![Staging healthy after version 1.2.0 promotion](../evidences/task-07/33-staging-v1.2.0-synced-healthy.png)
+
 
 Three release tags were verified:
 
@@ -2582,6 +2668,27 @@ The release workflow included:
 
 ### Failure and recovery
 
+**Figure 7.6: Development rollout of faulty backend.**
+
+![Development rollout of faulty backend](../evidences/task-07/27-dev-faulty-backend-rollout.png)
+
+**Figure 7.7: Backend startup failure and diagnostic output.**
+
+![Backend startup failure and diagnostic output](../evidences/task-07/28-backend-1.1-startup-failure.png)
+
+**Figure 7.8: Argo CD rollback refusal.**
+
+![Argo CD rollback refusal](../evidences/task-07/29-argocd-rollback-refused.png)
+
+**Figure 7.9: Development restored after Git revert.**
+
+![Development restored after Git revert](../evidences/task-07/30-dev-recovered-after-git-revert.png)
+
+**Figure 7.10: Corrected backend version 1.1 healthy.**
+
+![Corrected backend version 1.1 healthy](../evidences/task-07/31-dev-backend-1.1-fix-forward-healthy.png)
+
+
 The faulty backend 1.1 release required the `RELEASE_MODE`
 environment variable, which was missing from its configuration.
 
@@ -2591,7 +2698,7 @@ Argo CD refused the rollback operation while automated
 synchronization was enabled.
 
 Recovery was completed using a Git revert, followed by a
-corrected fix-forward release.
+corrected corrected release release.
 
 Staging remained pinned to its approved release until
 manual promotion. The faulty development commit was not
@@ -2600,6 +2707,15 @@ promoted to staging.
 The detailed explanation is recorded under Q5 in `README.md`.
 
 ### Git and pull request evidence
+
+**Figure 7.13: Staging deployment history.**
+
+![Staging deployment history](../evidences/task-07/34-staging-deployment-history.png)
+
+**Figure 7.14: Git history and pull request evidence.**
+
+![Git history and pull request evidence](../evidences/task-07/35-git-history-and-pull-requests.png)
+
 
 The release process was recorded through Git commits,
 release tags, and GitHub pull requests.
@@ -2638,44 +2754,33 @@ All six Argo CD Applications reported `Synced` and `Healthy`.
 The development and staging backend, frontend, and database
 workloads were ready after the Task 09 rebuild.
 
-Both PostSync smoke-test Jobs completed successfully.
+Both PostSync smoke test Jobs completed successfully.
 
 These results confirm the final recovered state. Historical
 deployment failures and recovery actions are documented by
 the screenshots and Git history.
 
-### Screenshot evidence
-
-Task 07 contains 14 screenshots under `evidences/task-07/`.
-
-They document:
-
-- Frontend 1.1 deployment in development.
-- Staging promotion to v1.1.0.
-- Faulty backend deployment and startup failure.
-- Argo CD rollback refusal.
-- Successful recovery through Git revert.
-- Backend fix-forward deployment.
-- Staging promotion to v1.2.0.
-- Deployment history and GitHub pull requests.
 
 ### Result
 
 The release workflow demonstrated controlled staging
-promotion, Git-based recovery, and successful fix-forward
+promotion, Git based recovery, and successful corrected release
 deployment.
 
----
 
-
-## Task 8 — Drift, Pruning and AppProject Guardrails
+## Task 8 : Drift, Pruning and AppProject Guardrails
 
 ### Objective
 
-Verify Argo CD drift detection, development self-healing, staging manual
+Verify Argo CD drift detection, development automatic recovery, staging manual
 reconciliation, GitOps resource pruning, and AppProject resource restrictions.
 
-### Drill 1 — Development Self-Healing
+### Drill 1 : Development Self-Healing
+
+**Figure 8.1: Development drift automatically corrected.**
+
+![Development drift automatically corrected](../evidences/task-08/36-dev-drift-self-healing.png)
+
 
 **Prediction:** Manually scaling the development backend from one to three
 replicas would cause drift, and Argo CD would automatically restore the
@@ -2685,14 +2790,22 @@ Git-declared replica count.
 three replicas.
 
 **Observation:** Argo CD detected and corrected the drift automatically
-because development has automated synchronization with self-healing enabled.
+because development has automated synchronization with automatic recovery enabled.
 
 **Restoration:** Argo CD restored the backend to one replica without a
 manual synchronization.
 
-**Evidence:** `evidences/task-08/36-dev-drift-self-healing.png`
 
-### Drill 2 — Staging Drift and Manual Reconciliation
+### Drill 2 : Staging Drift and Manual Reconciliation
+
+**Figure 8.2: Staging drift before manual synchronization.**
+
+![Staging drift before manual synchronization](../evidences/task-08/37-staging-drift-before-manual-sync.png)
+
+**Figure 8.3: Staging restored by manual synchronization.**
+
+![Staging restored by manual synchronization](../evidences/task-08/38-staging-restored-manual-sync.png)
+
 
 **Prediction:** Scaling the staging backend to three replicas would
 produce an OutOfSync state without automatic restoration.
@@ -2707,11 +2820,17 @@ desired replica.
 **Restoration:** Manually synchronized `tasktracker-staging`, restoring
 one replica and returning the application to Synced and Healthy.
 
-**Evidence:**
-- `evidences/task-08/37-staging-drift-before-manual-sync.png`
-- `evidences/task-08/38-staging-restored-manual-sync.png`
 
-### Drill 3 — GitOps Pruning
+### Drill 3 : GitOps Pruning
+
+**Figure 8.4: Temporary ConfigMap created from Git.**
+
+![Temporary ConfigMap created from Git](../evidences/task-08/39-prune-configmap-created.png)
+
+**Figure 8.5: Temporary ConfigMap removed by pruning.**
+
+![Temporary ConfigMap removed by pruning](../evidences/task-08/40-prune-configmap-removed.png)
+
 
 **Prediction:** A temporary ConfigMap committed to the development
 platform manifests would be created by Argo CD. Removing the manifest
@@ -2728,11 +2847,17 @@ Synced and Healthy.
 The namespace was protected using `Prune=false`; this did not prevent
 pruning of the temporary ConfigMap.
 
-**Evidence:**
-- `evidences/task-08/39-prune-configmap-created.png`
-- `evidences/task-08/40-prune-configmap-removed.png`
 
-### Drill 4 — AppProject Resource Guardrails
+### Drill 4 : AppProject Resource Guardrails
+
+**Figure 8.6: AppProject rejects forbidden ResourceQuota.**
+
+![AppProject rejects forbidden ResourceQuota](../evidences/task-08/41-appproject-resourcequota-rejected.png)
+
+**Figure 8.7: Development healthy after reverting forbidden resource.**
+
+![Development healthy after reverting forbidden resource](../evidences/task-08/42-development-restored-after-guardrail-revert.png)
+
 
 **Prediction:** Adding a ResourceQuota to the workload Helm chart
 would be rejected because ResourceQuota is not permitted by the
@@ -2752,9 +2877,6 @@ Development returned to Synced and Healthy at revision `0cab3b5`.
 The ResourceQuota was absent from Git, Kubernetes, and the current
 desired manifests. No AppProject permissions were weakened.
 
-**Evidence:**
-- `evidences/task-08/41-appproject-resourcequota-rejected.png`
-- `evidences/task-08/42-development-restored-after-guardrail-revert.png`
 
 ### Final Verification
 
@@ -2774,9 +2896,8 @@ reconciled drift, staging required manual synchronization, GitOps
 pruned the temporary ConfigMap, and AppProject restrictions prevented
 deployment of an unauthorized resource.
 
----
 
-## Task 9 — Disaster Recovery and GitOps Rebuild
+## Task 9 : Disaster Recovery and GitOps Rebuild
 
 ### Objective
 
@@ -2785,6 +2906,51 @@ while restoring the original Sealed Secrets encryption key and
 preserving controlled manual synchronization for staging.
 
 ### Recovery Procedure
+
+**Figure 9.1: Original cluster and Git state before rebuild.**
+
+![Original cluster and Git state before rebuild](../evidences/task-09/43-pre-rebuild-cluster-and-git-state.png)
+
+**Figure 9.2: Protected sealing key backup verification.**
+
+![Protected sealing key backup verification](../evidences/task-09/44-fresh-sealing-key-backup.png)
+
+**Figure 9.3: Cluster deletion and recreation.**
+
+![Cluster deletion and recreation](../evidences/task-09/45-cluster-deleted-and-recreated.png)
+
+**Figure 9.4: Sealing key restored before controller installation.**
+
+![Sealing key restored before controller installation](../evidences/task-09/46-sealing-key-restored-before-controller.png)
+
+**Figure 9.5: Argo CD installation from Git configuration.**
+
+![Argo CD installation from Git configuration](../evidences/task-09/47-argocd-reinstalled-from-git.png)
+
+**Figure 9.6: Root Application bootstrap.**
+
+![Root Application bootstrap](../evidences/task-09/48-root-application-bootstrap.png)
+
+**Figure 9.7: Applications recreated from Git.**
+
+![Applications recreated from Git](../evidences/task-09/49-applications-recreated-from-git.png)
+
+**Figure 9.8: Sealed Secrets and workloads recovered.**
+
+![Sealed Secrets and workloads recovered](../evidences/task-09/50-sealed-secrets-and-workload-recovery.png)
+
+**Figure 9.9: Development recovered automatically.**
+
+![Development recovered automatically](../evidences/task-09/51-development-recovered-from-git.png)
+
+**Figure 9.10: Staging waiting for manual synchronization.**
+
+![Staging waiting for manual synchronization](../evidences/task-09/52-staging-before-manual-sync.png)
+
+**Figure 9.11: Manual staging synchronization after rebuild.**
+
+![Manual staging synchronization after rebuild](../evidences/task-09/53-staging-manual-sync-after-rebuild.png)
+
 
 1. Recorded Git revision `441fc8c` and the original cluster state.
 2. Backed up the active Sealed Secrets encryption key outside Git
@@ -2801,6 +2967,23 @@ preserving controlled manual synchronization for staging.
    connectivity, and recovered credentials.
 
 ### Recovery Results
+
+**Figure 9.12: Both environments restored and healthy.**
+
+![Both environments restored and healthy](../evidences/task-09/54-both-environments-recovered.png)
+
+**Figure 9.13: Backend API and database verification.**
+
+![Backend API and database verification](../evidences/task-09/55-development-and-staging-api-verification.png)
+
+**Figure 9.14: Frontend verification for both environments.**
+
+![Frontend verification for both environments](../evidences/task-09/56-development-and-staging-frontend-verification.png)
+
+**Figure 9.15: Recovered encryption key and generated credential verification.**
+
+![Recovered encryption key and generated credential verification](../evidences/task-09/57-restored-encryption-key-and-credentials.png)
+
 
 | Verification | Result |
 |---|---|
@@ -2832,17 +3015,6 @@ The elapsed time is not a benchmark of fully automated recovery.
 Development recovered automatically, while staging was intentionally
 held until manual synchronization.
 
-### Evidence
-
-Screenshots are stored in `evidences/task-09/`:
-
-- `43`–`44`: Original cluster state and encryption-key backup.
-- `45`–`46`: Cluster recreation and key restoration.
-- `47`–`49`: Argo CD installation and GitOps bootstrap.
-- `50`–`52`: Credentials, development recovery, and staging protection.
-- `53`–`54`: Manual staging synchronization and final application health.
-- `55`–`56`: Backend API, database, and frontend verification.
-- `57`: Restored encryption key and generated credentials.
 
 ### Conclusion
 
