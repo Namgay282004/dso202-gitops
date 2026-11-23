@@ -1,4 +1,129 @@
-# dso202-gitops
+# DSO202 Assignment 4 — GitOps with Argo CD
+
+## Project Overview
+
+This repository implements GitOps-based deployment of the
+Task Tracker application using Kubernetes, Helm, Argo CD,
+and Sealed Secrets.
+
+The application is deployed to two environments:
+
+- Development (`dso202-dev`): follows the `main` branch
+  with automated synchronization, pruning, and self-healing.
+- Staging (`dso202-staging`): follows a pinned Git release
+  tag and requires manual synchronization.
+
+The repository also includes Kubernetes platform policies,
+Argo CD AppProjects, application definitions, encrypted
+SealedSecrets, and disaster recovery documentation.
+
+## Repository
+
+- GitHub: https://github.com/Namgay282004/dso202-gitops
+- Main branch: `main`
+- Release tags: `v1.0.0`, `v1.1.0`, `v1.2.0`
+- Cluster name: `dso202-gitops`
+
+## Verified Tool Versions
+
+| Component | Version |
+|---|---|
+| Docker Engine | 28.3.3 |
+| Kind | 0.32.0 |
+| Kubernetes node | 1.36.1 (digest pinned in cluster configuration) |
+| kubectl | 1.36.3 |
+| Helm CLI | 4.3.0 |
+| Argo CD | 3.5.6 |
+| Sealed Secrets Helm chart | 2.20.0 |
+| kubeseal | 0.40.0 |
+| Git | 2.34.1 |
+
+The Kind node image is pinned to an immutable SHA-256 digest
+in `cluster/kind-cluster.yaml`.
+
+Argo CD is installed from its pinned v3.5.6 release
+manifest. Sealed Secrets uses Helm chart version 2.20.0.
+
+## Documentation
+
+- `docs/evidence.md`: command outputs, observations,
+  and verification evidence for Tasks 01–09.
+- `evidences/`: supporting screenshots organized by task.
+- `charts/tasktracker/`: Helm chart for the application.
+- `environments/`: development and staging Helm values.
+- `platform/`: namespace policies and encrypted credentials.
+- `argocd/`: declarative Applications and AppProjects.
+- `bootstrap/`: initial Argo CD and root Application setup.
+- `cluster/`: reproducible Kind cluster configuration.
+
+---
+
+## Rebuild from an Empty Kind Cluster
+
+The following is the documented Task 9 recovery procedure, **not a command to run during submission**. On a new machine, install Docker, Git, Kind, kubectl, Helm, Argo CD CLI and kubeseal. Use the pinned versions listed above; Docker must be running. The separately secured Sealed Secrets key backup is an external recovery dependency and is **not in Git**. Commands assume the backup is available at the stated sibling path.
+
+```bash
+git clone https://github.com/Namgay282004/dso202-gitops.git
+cd dso202-gitops
+kind create cluster --name dso202-gitops --config cluster/kind-cluster.yaml
+kubectl get nodes
+```
+
+Restore the original sealing key **before** the Sealed Secrets controller is installed. Do not print or commit the key backup.
+
+```bash
+kubectl create namespace sealed-secrets
+kubectl apply -f ../dso202-keys/sealing-key.backup.yaml
+kubectl apply -k bootstrap/argocd --server-side --force-conflicts
+kubectl wait --for=condition=Available deployment --all -n argocd --timeout=300s
+kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
+kubectl apply -f bootstrap/root
+kubectl get applications -n argocd -w
+```
+
+The root Application reconciles the remaining AppProjects and Applications from Git. Development follows `main` with automated synchronization, pruning and self-healing. Staging follows pinned release `v1.2.0` and **must be synchronized manually**.
+
+Start the Argo CD port-forward in a separate terminal:
+
+```bash
+kubectl port-forward -n argocd svc/argocd-server 8080:443
+```
+
+In the main terminal, retrieve the newly generated administrator password privately and log in. Never record the password in screenshots or Git.
+
+```bash
+argocd admin initial-password -n argocd
+argocd login localhost:8080 --username admin --insecure
+argocd app sync tasktracker-staging
+kubectl get applications -n argocd
+kubectl get deployments,statefulsets,jobs -n dso202-dev
+kubectl get deployments,statefulsets,jobs -n dso202-staging
+kubectl logs job/tasktracker-smoke-test -n dso202-dev
+kubectl logs job/tasktracker-smoke-test -n dso202-staging
+```
+
+The development frontend is reachable at `http://localhost:30080`. The Kind host port mapping does **not** expose staging NodePort 30081; use a separate terminal for:
+
+```bash
+kubectl port-forward -n dso202-staging svc/tasktracker-frontend-service 8081:80
+```
+
+Open `http://localhost:8081` for staging. Verify CRUD operations and both environments' API and smoke tests. After recovery, refresh the protected sealing-key backup using the Task 4 procedure, retaining the file outside Git with restrictive permissions. Task 9 evidence and timings are in `docs/evidence.md` and `evidences/task-09/`. The previous database contents are not recovered by GitOps.
+
+## Cleanup
+
+**Destructive — only run when intentionally removing the local lab:**
+
+```bash
+kind delete cluster --name dso202-gitops
+```
+
+Stop port-forward terminals with Ctrl+C. Cluster deletion destroys its local database contents, but not the Git repository or the separately protected key backup.
+
+## Credential Handling
+
+The chart refers to existing Kubernetes Secrets; it does not render plaintext Secret resources. Git contains encrypted SealedSecret manifests for both environments. The Sealed Secrets controller decrypts them inside the cluster. Strict scope binds encrypted values to the Secret name and namespace. Plaintext input files (`secrets-plain/`) and the private sealing-key backup (`../dso202-keys/sealing-key.backup.yaml`) are excluded from Git. The backup file is permission `600`, with its directory restricted to `700`. Access to the private key would permit decryption of credentials encrypted for its corresponding public key. Database contents require a separate production backup strategy.
+
 ---
 
 ## Written Questions
@@ -91,6 +216,20 @@ The key restoration and cluster recovery process will be
 demonstrated in Task 9.
 
 
+### Q3 — Synced versus Healthy
+
+**Synced** means the live Kubernetes resources match the desired manifests at the Application's selected Git revision. **Healthy** means Argo CD's health assessments report that those resources are functioning as expected. These are independent: an Application can be Synced while its Deployment is unavailable or its Job is failing.
+
+In Task 5, staging initially required a manual sync: the root Application could have its child Application definitions synchronized from Git while the unsynchronized staging workload was still Missing/Progressing. Another reproducible example is a Deployment whose desired image and manifest have been applied (Synced) but whose Pod fails readiness checks (not Healthy). The recorded Task 5 observations and Application status outputs are in `docs/evidence.md`.
+
+### Q4 — Argo CD RBAC, Kubernetes RBAC, and SSO
+
+**Argo CD RBAC** authorizes operations through Argo CD, such as viewing Applications, reading logs, synchronizing workloads and accessing projects. It is configured in the Argo CD `argocd-rbac-cm` ConfigMap via `policy.csv` and related settings, represented in `bootstrap/argocd/argocd-rbac-cm-patch.yaml`. In Task 6, `reviewer` could read only the `dso202` project Applications, could not sync, and received log access only after an explicit policy rule was committed and the bootstrap layer reapplied.
+
+**Kubernetes RBAC** controls Kubernetes API access to resources using Roles, ClusterRoles, RoleBindings and ClusterRoleBindings. The application namespace policies from Assignment 2 are maintained under `platform/dev/` and `platform/staging/`; they do not grant the reviewer permission to synchronize Argo CD Applications.
+
+With an organizational identity provider connected through SSO, `policy.csv` would normally map authenticated identity-provider groups to Argo CD roles using `g, <identity-provider-group>, <role>` rules. The `p, ...` permission rules could remain role-based, while the local `reviewer` account would no longer be needed for that identity. SSO was **not** configured in this assignment.
+
 ### Q5 — Rollback, Fix-Forward and Staging Protection
 
 **Question: Why was the Argo CD rollback refused, how was the failed release recovered, and how was staging protected?**
@@ -142,3 +281,20 @@ the faulty backend release was never deployed to staging.
 This exercise demonstrated how Git revert restores a stable state,
 fix-forward corrects failed releases, and manual staging promotion
 prevents unverified changes from reaching staging.
+
+
+`git revert` creates an auditable inverse commit while preserving the original faulty change and its investigation history; deleting or rewriting the bad commit would break the shared history that GitOps and reviewers rely on.
+### Q6 — Repository Trade-offs and Recovery Boundaries
+
+**(a) One repository for chart and environment configuration.** Two advantages are (1) a single pull request can review application deployment definitions and environment values together, and (2) releases and disaster recovery are easier to trace because related configuration lives in one versioned history. Two disadvantages are (1) changes to application and environment configuration have a shared review/access boundary, making least-privilege ownership harder, and (2) the repository can become noisy and tightly coupled as teams and environments grow. Separate application-source and deployment-configuration repositories can support independent access and release lifecycles.
+
+**(b) What GitOps does not restore automatically.**
+
+- **Kind cluster and underlying host/Docker:** Git records the cluster configuration, but creating the host and cluster is an external bootstrap action; production teams typically use infrastructure-as-code and managed infrastructure provisioning.
+- **Argo CD installation and its bootstrap ConfigMaps:** These are installed by `kubectl apply -k bootstrap/argocd`, outside Argo CD's own reconciliation; production teams typically provision and upgrade this bootstrap layer through infrastructure automation or a dedicated platform deployment pipeline.
+- **Initial platform AppProject and root Application:** The bootstrap objects in `bootstrap/root/` must be applied before the root can reconcile children; production teams typically manage these foundational resources using a controlled bootstrap process.
+- **Sealed Secrets private key:** Git stores encrypted SealedSecrets but not the private key; production teams store, rotate, back up and restore encryption keys using restricted secret-management and disaster-recovery processes.
+- **Database contents and persistent data:** Git stores deployment configuration, not user-created task records; production teams use database backups, point-in-time recovery and restore testing.
+- **Manual staging approval:** The Git tag is declarative, but the act of authorizing a manual sync is an operational decision; production teams typically use protected promotion workflows and audited approvals.
+
+Task 9 proved that the deployment configuration and credentials could be recovered using Git plus the protected key backup; previous database contents were intentionally lost.
